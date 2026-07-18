@@ -1,0 +1,82 @@
+---
+title: "Core concepts"
+description: "The key objects and terms you'll work with in the Formable API."
+---
+
+Formable has two main workflows — **e-signatures** and **redlining** — that both start from a **template**. This page explains the objects you'll reference throughout the API.
+
+## Templates
+
+A **template** is a document you've uploaded (PDF or DOCX) along with the fields placed on it. Templates are reusable: you upload once, then create many signature or redline requests from the same `templateId`.
+
+- Create a template by uploading a file to [Create a template](/api-reference/endpoint/create-template).
+- Place fields (signature, text, date, checkbox, amount) using the **editor URL** returned on creation, or fetch a fresh one with [Create a template edit URL](/api-reference/endpoint/create-template-edit-url).
+- Redlining requires the template to have a **DOCX** source file, since redlining edits the underlying document.
+
+## Signature requests
+
+A **signature request** represents one document sent to one signer. It captures the `templateId`, the `signer`, the `sender`, and a `status`.
+
+| Field | Description |
+| --- | --- |
+| `signer` | The person who signs the document (`email` + `name`). |
+| `sender` | The person or organization sending it (`email` + `name`). |
+| `status` | `Created` when made, `Completed` once signed. |
+| `testMode` | When `true`, the request doesn't count toward billing. |
+
+To let someone sign, you generate a short-lived **signing URL** from the signature request. Once signing finishes, the signed document is available as a **signed envelope** (a presigned download URL).
+
+<Info>
+  An **envelope** is the internal record of a document that has been enriched with a recipient and can be signed. As an API consumer, you interact with signature requests; the envelope is what produces the final signed PDF.
+</Info>
+
+## Redline requests
+
+A **redline request** represents a contract being negotiated between two parties. Instead of signing, members exchange revisions to a DOCX document in **turns** until it's ready for signing.
+
+### Members and roles
+
+Every redline request has **members**, each with a `role`:
+
+| Role | Who they are |
+| --- | --- |
+| `DisclosingParty` | The party that originated the contract. |
+| `ReceivingParty` | The party requesting changes to the contract. |
+| `DisclosingCounsel` | Someone helping the disclosing party (invited later). |
+| `ReceivingCounsel` | Someone helping the receiving party (invited later). |
+
+### Rounds and status
+
+Redlining is turn-based. The `currentRound` field tells you whose turn it is (`Disclosing` or `Receiving`), and `status` tracks where the negotiation stands:
+
+| Status | Meaning |
+| --- | --- |
+| `ReceivingPartyOpened` | The receiving party opened the document. |
+| `ReceivingPartyDraft` | The receiving party is drafting revisions. |
+| `ReceivingPartyRequestedReview` | The receiving party sent revisions back for review. |
+| `DisclosingPartyDraft` | The disclosing party is drafting revisions. |
+| `DisclosingPartyRequestedReview` | The disclosing party sent revisions back for review. |
+| `DocumentReadyForSigning` | All changes resolved; the document is ready to sign. |
+
+To let a member work on their turn, you generate a **redline URL** for that member's email.
+
+## URLs are short-lived and embeddable
+
+Both signing URLs and redline URLs are meant to be **embedded in an iframe** in your own product. They expire, so generate them on demand right before you display them rather than storing them.
+
+<Warning>
+  Generate signing and redline URLs from your backend and pass them to the client just-in-time. Never expose your API credentials in client-side code.
+</Warning>
+
+## Test mode
+
+Both signature requests and redline requests accept a `testMode` flag. Use it while integrating so your activity doesn't count toward billing or trigger production behavior.
+
+## Events
+
+Every workflow records **events** you can retrieve to track progress:
+
+- [Signature request events](/api-reference/endpoint/get-signature-request-events)
+- [Redline request events](/api-reference/endpoint/get-redline-request-events)
+
+Poll these to react to state changes such as a document being signed or a turn ending.

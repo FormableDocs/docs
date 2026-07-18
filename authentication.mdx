@@ -1,0 +1,118 @@
+---
+title: "Authentication"
+description: "Authenticate requests with an OAuth 2.0 bearer token."
+---
+
+The Formable API authenticates requests using **OAuth 2.0 client credentials**. You exchange a client ID and client secret for a short-lived access token, then send that token as a Bearer token on every request.
+
+<Note>
+  Contact [support@formabledocs.com](mailto:support@formabledocs.com) to get API credentials for your organization. You'll receive a **client ID**, a **client secret**, and the **token URL** and **audience** to use.
+</Note>
+
+## Get an access token
+
+Request a token from your token URL using the client credentials grant. Pass the `audience` so the token is scoped to the Formable API.
+
+<CodeGroup>
+
+```bash cURL
+curl --request POST \
+  --url https://YOUR_TENANT.auth0.com/oauth/token \
+  --header 'content-type: application/json' \
+  --data '{
+    "client_id": "YOUR_CLIENT_ID",
+    "client_secret": "YOUR_CLIENT_SECRET",
+    "audience": "https://formable-production.up.railway.app/api",
+    "grant_type": "client_credentials"
+  }'
+```
+
+```javascript Node.js
+const res = await fetch("https://YOUR_TENANT.auth0.com/oauth/token", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({
+    client_id: process.env.FORMABLE_CLIENT_ID,
+    client_secret: process.env.FORMABLE_CLIENT_SECRET,
+    audience: "https://formable-production.up.railway.app/api",
+    grant_type: "client_credentials",
+  }),
+});
+
+const { access_token } = await res.json();
+```
+
+```python Python
+import os
+import requests
+
+res = requests.post(
+    "https://YOUR_TENANT.auth0.com/oauth/token",
+    json={
+        "client_id": os.environ["FORMABLE_CLIENT_ID"],
+        "client_secret": os.environ["FORMABLE_CLIENT_SECRET"],
+        "audience": "https://formable-production.up.railway.app/api",
+        "grant_type": "client_credentials",
+    },
+)
+
+access_token = res.json()["access_token"]
+```
+
+</CodeGroup>
+
+A successful response returns an access token and its lifetime in seconds:
+
+```json
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR...",
+  "token_type": "Bearer",
+  "expires_in": 86400
+}
+```
+
+## Use the token
+
+Include the access token in the `Authorization` header of every API request.
+
+```bash
+curl --request GET \
+  --url https://formable-production.up.railway.app/api/v0/signature-requests \
+  --header 'Authorization: Bearer YOUR_ACCESS_TOKEN'
+```
+
+<Tip>
+  Cache the access token and reuse it until it expires rather than requesting a new one per call. Refresh it when you receive a `401` response.
+</Tip>
+
+## Base URLs
+
+<CodeGroup>
+
+```text Production
+https://formable-production.up.railway.app/api
+```
+
+```text Local
+http://localhost:4000/api
+```
+
+</CodeGroup>
+
+All endpoints are versioned under `/v0`, so a full URL looks like `https://formable-production.up.railway.app/api/v0/signature-requests`.
+
+## Authorization errors
+
+Requests fail with a `401` when the bearer token is missing, malformed, or expired:
+
+```json
+{
+  "error": "Auth token not valid"
+}
+```
+
+A `403` means the token is valid but your organization isn't authorized for the resource — for example, creating an edit URL for a template that belongs to another organization.
+
+<Warning>
+  Never expose your client secret in browser or mobile code. Request tokens from a backend service, and only pass short-lived signing and redline URLs to the client.
+</Warning>

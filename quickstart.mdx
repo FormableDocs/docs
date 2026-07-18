@@ -1,47 +1,130 @@
 ---
 title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+description: "Create your first signature request and get an embeddable signing URL."
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
-
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
+This guide takes you from zero to a live, embeddable signing session. You'll upload a document, send it for signature, and generate a URL your signer can open.
 
 ## Prerequisites
 
-Before you begin, you must have:
+Before you begin, you need:
 
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
+- **API credentials** (client ID and secret) from [support@formabledocs.com](mailto:support@formabledocs.com)
+- An **access token** — see [Authentication](/authentication)
+- A **PDF or DOCX file** under 40MB to send for signature
 
-## Get started
+<Info>
+  The examples below use the production base URL `https://formable-production.up.railway.app/api`. Replace `$TOKEN` with your access token.
+</Info>
+
+## Steps
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
+  <Step title="Upload a template">
+    Upload your document as `multipart/form-data`. Formable returns a `templateId` you'll use to send the document.
 
     ```bash
-    npm install your-package
+    curl --request POST \
+      --url https://formable-production.up.railway.app/api/v0/templates \
+      --header "Authorization: Bearer $TOKEN" \
+      --form 'file=@./agreement.pdf' \
+      --form 'filename=agreement.pdf'
+    ```
+
+    ```json Response
+    {
+      "templateId": "abc123xyz",
+      "editTemplateAccess": {
+        "editUrl": "https://app.formabledocs.com/template-setup/abc123xyz",
+        "expiresAt": "2024-01-16T10:30:00.000Z"
+      }
+    }
+    ```
+
+    <Tip>
+      Open the `editUrl` in a browser to place signature, text, and date fields on the document. See [Manage templates](/guides/templates).
+    </Tip>
+  </Step>
+
+  <Step title="Create a signature request">
+    Create a signature request from the template. Provide the `signer` (who signs) and the `sender` (who's sending it).
+
+    ```bash
+    curl --request POST \
+      --url https://formable-production.up.railway.app/api/v0/signature-requests \
+      --header "Authorization: Bearer $TOKEN" \
+      --header 'Content-Type: application/json' \
+      --data '{
+        "templateId": "abc123xyz",
+        "signer": { "email": "signer@example.com", "name": "Jane Doe" },
+        "sender": { "email": "you@yourcompany.com", "name": "Your Company" }
+      }'
+    ```
+
+    ```json Response
+    {
+      "signatureRequestId": "sr_456def"
+    }
     ```
   </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+
+  <Step title="Generate a signing URL">
+    Turn the signature request into an embeddable signing URL. The URL expires one hour after creation.
 
     ```bash
-    your-cli init
+    curl --request POST \
+      --url https://formable-production.up.railway.app/api/v0/signature-requests/sr_456def/url \
+      --header "Authorization: Bearer $TOKEN"
+    ```
+
+    ```json Response
+    {
+      "signingUrl": "https://app.formabledocs.com/sign/embedded/xyz789abc",
+      "expiresAt": "2024-01-16T10:30:00.000Z"
+    }
+    ```
+
+    Load the `signingUrl` in an iframe or redirect the signer to it:
+
+    ```html
+    <iframe src="https://app.formabledocs.com/sign/embedded/xyz789abc" width="100%" height="800"></iframe>
     ```
   </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
+
+  <Step title="Retrieve the signed document">
+    Once the signer completes the document, download the signed PDF from a presigned URL.
 
     ```bash
-    your-cli start
+    curl --request GET \
+      --url https://formable-production.up.railway.app/api/v0/signature-requests/sr_456def/signed-envelope \
+      --header "Authorization: Bearer $TOKEN"
     ```
+
+    ```json Response
+    {
+      "signedEnvelopePresignedUrl": "https://s3.amazonaws.com/bucket/signed-envelope.pdf?..."
+    }
+    ```
+
+    <Note>
+      This endpoint returns `409` until the document is signed. Poll [signature request events](/api-reference/endpoint/get-signature-request-events) or check the [signature request](/api-reference/endpoint/get-signature-request) `status` to know when it's `Completed`.
+    </Note>
   </Step>
 </Steps>
 
-<Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
+## Next steps
 
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
-</Tip>
+<CardGroup cols={2}>
+  <Card title="E-signature workflow" icon="signature" href="/guides/e-signatures">
+    Prefill fields, use test mode, and track completion.
+  </Card>
+  <Card title="Redlining workflow" icon="pen-line" href="/guides/redlining">
+    Run a turn-based contract negotiation between two parties.
+  </Card>
+  <Card title="Core concepts" icon="book" href="/concepts">
+    Understand templates, envelopes, and redline roles.
+  </Card>
+  <Card title="API reference" icon="code" href="/api-reference/introduction">
+    Browse every endpoint with a live playground.
+  </Card>
+</CardGroup>

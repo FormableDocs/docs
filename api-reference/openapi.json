@@ -1,0 +1,941 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Formable API",
+    "version": "1.0.0",
+    "description": "The Formable API lets you embed e-signature and document redlining workflows directly into your product. Create templates, send documents for signature, run collaborative redline negotiations, and retrieve completed documents."
+  },
+  "servers": [
+    {
+      "url": "https://formable-production.up.railway.app/api",
+      "description": "Production"
+    },
+    {
+      "url": "http://localhost:4000/api",
+      "description": "Local"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    { "name": "Templates", "description": "Upload documents and generate editor URLs." },
+    { "name": "Signature Requests", "description": "Send documents for e-signature and retrieve signed results." },
+    { "name": "Redlining", "description": "Create and manage collaborative redline negotiations." },
+    { "name": "Billing", "description": "Retrieve usage information." },
+    { "name": "Health", "description": "Service health checks." }
+  ],
+  "paths": {
+    "/v0/templates": {
+      "post": {
+        "summary": "Create a template",
+        "operationId": "createTemplate",
+        "description": "Upload a PDF or DOCX file to create a new template. The file must be under 40MB and be either a PDF, DOC, or DOCX file.",
+        "tags": ["Templates"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file", "filename"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The PDF or DOCX file to upload (max 40MB)."
+                  },
+                  "filename": {
+                    "type": "string",
+                    "description": "The name of the file including extension.",
+                    "example": "document.docx"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Template created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "templateId": {
+                      "type": "string",
+                      "description": "The unique identifier of the created template.",
+                      "example": "abc123xyz"
+                    },
+                    "editTemplateAccess": {
+                      "type": "object",
+                      "description": "Template editing access information.",
+                      "properties": {
+                        "editUrl": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "URL to access the template editor.",
+                          "example": "https://app.formabledocs.com/template-setup/abc123xyz"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "ISO 8601 timestamp when the edit access expires (1 day from creation by default).",
+                          "example": "2024-01-16T10:30:00.000Z"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequestError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedError" },
+          "413": {
+            "description": "File size exceeds 40MB limit.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "File size exceeds the 40MB limit" } } }
+          },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+    "/v0/templates/{templateId}/edit-url": {
+      "post": {
+        "summary": "Create a template edit URL",
+        "operationId": "createTemplateEditUrl",
+        "description": "Generates an edit URL for a template. The URL can be used to access the template editor interface, where you can place and configure fields. The client must be authorized to edit the template.",
+        "tags": ["Templates"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "templateId",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "The ID of the template to create an edit URL for.",
+            "example": "abc123xyz"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Edit URL created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "editUrl": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "The generated edit URL for the template.",
+                      "example": "https://app.formabledocs.com/template-setup/abc123xyz"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601 timestamp when the edit access expires (1 day from creation by default).",
+                      "example": "2024-01-16T10:30:00.000Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequestError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedError" },
+          "403": { "$ref": "#/components/responses/ForbiddenError" },
+          "404": { "$ref": "#/components/responses/NotFoundError" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+    "/v0/signature-requests": {
+      "post": {
+        "summary": "Create a signature request",
+        "operationId": "createSignatureRequest",
+        "description": "Creates a new signature request from a template. Requires a templateId, a signer (email and name), and a sender (email and name). Optionally accepts a fields array to pre-fill template fields before sending.",
+        "tags": ["Signature Requests"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["templateId", "signer", "sender"],
+                "properties": {
+                  "templateId": {
+                    "type": "string",
+                    "description": "The ID of the template to create a signature request for.",
+                    "example": "abc123xyz"
+                  },
+                  "signer": {
+                    "type": "object",
+                    "required": ["email", "name"],
+                    "properties": {
+                      "email": { "type": "string", "format": "email", "description": "Email address of the signer.", "example": "signer@example.com" },
+                      "name": { "type": "string", "description": "Name of the signer.", "example": "Jane Doe" }
+                    }
+                  },
+                  "sender": {
+                    "type": "object",
+                    "required": ["email", "name"],
+                    "properties": {
+                      "email": { "type": "string", "format": "email", "description": "Email address of the sender.", "example": "sender@example.com" },
+                      "name": { "type": "string", "description": "Name of the sender.", "example": "John Smith" }
+                    }
+                  },
+                  "testMode": {
+                    "type": "boolean",
+                    "description": "Optional flag to mark the signature request as a test. Test mode requests are not counted toward billing.",
+                    "example": false
+                  },
+                  "fields": {
+                    "type": "array",
+                    "description": "Optional array of fields to pre-fill in the template.",
+                    "items": {
+                      "type": "object",
+                      "required": ["fieldId", "value"],
+                      "properties": {
+                        "fieldId": { "type": "string", "description": "The ID of the field in the template.", "example": "field_123" },
+                        "value": { "type": "string", "description": "The value to pre-fill in the field.", "example": "Acme Corporation" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signature request created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "signatureRequestId": {
+                      "type": "string",
+                      "description": "The unique identifier of the created signature request.",
+                      "example": "abc123xyz"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequestError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedError" },
+          "403": { "$ref": "#/components/responses/ForbiddenError" },
+          "404": { "$ref": "#/components/responses/NotFoundError" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      },
+      "get": {
+        "summary": "List signature requests",
+        "operationId": "listSignatureRequests",
+        "description": "Returns all signature requests for the authenticated client's organization, newest first. Optionally pass updatedSince to return only requests updated strictly after that instant (ISO-8601).",
+        "tags": ["Signature Requests"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "updatedSince",
+            "required": false,
+            "schema": { "type": "string", "format": "date-time" },
+            "description": "ISO-8601 timestamp; only signature requests updated strictly after this time are returned.",
+            "example": "2024-01-15T10:30:00.000Z"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signature requests retrieved successfully (empty array if none match).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/SignatureRequest" }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequestError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedError" },
+          "403": { "$ref": "#/components/responses/ForbiddenError" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+    "/v0/signature-requests/{signatureRequestId}": {
+      "get": {
+        "summary": "Get a signature request",
+        "operationId": "getSignatureRequest",
+        "description": "Retrieves a single signature request by ID.",
+        "tags": ["Signature Requests"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "signatureRequestId",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "The ID of the signature request.",
+            "example": "abc123xyz"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signature request retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SignatureRequest" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequestError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedError" },
+          "403": { "$ref": "#/components/responses/ForbiddenError" },
+          "404": { "$ref": "#/components/responses/NotFoundError" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+    "/v0/signature-requests/{signatureRequestId}/url": {
+      "post": {
+        "summary": "Create a signing URL",
+        "operationId": "createSigningUrl",
+        "description": "Generates a signing URL for a signature request. The URL can be embedded in an iframe or shared directly so the signer can complete the document. Signing URLs expire 1 hour after creation.",
+        "tags": ["Signature Requests"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "signatureRequestId",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "The ID of the signature request.",
+            "example": "abc123xyz"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signing URL created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["signingUrl", "expiresAt"],
+                  "properties": {
+                    "signingUrl": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "The generated signing URL for the signature request.",
+                      "example": "https://app.formabledocs.com/sign/embedded/xyz789abc"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601 timestamp when the signing URL expires (1 hour from creation).",
+                      "example": "2024-01-16T10:30:00.000Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequestError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedError" },
+          "403": { "$ref": "#/components/responses/ForbiddenError" },
+          "404": { "$ref": "#/components/responses/NotFoundError" },
+          "409": {
+            "description": "Conflict - the envelope has already been completed.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "Envelope has already been completed" } } }
+          },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+    "/v0/signature-requests/{signatureRequestId}/signed-envelope": {
+      "get": {
+        "summary": "Get a signed envelope",
+        "operationId": "getSignedEnvelope",
+        "description": "Retrieves a presigned URL for the signed document associated with a signature request. The signature request must be completed before the signed envelope is available.",
+        "tags": ["Signature Requests"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "signatureRequestId",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "The ID of the signature request.",
+            "example": "abc123xyz"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signed envelope retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "signedEnvelopePresignedUrl": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "Presigned URL to download the signed document.",
+                      "example": "https://s3.amazonaws.com/bucket/signed-envelope.pdf?presigned-params"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequestError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedError" },
+          "403": { "$ref": "#/components/responses/ForbiddenError" },
+          "404": { "$ref": "#/components/responses/NotFoundError" },
+          "409": {
+            "description": "Conflict - the envelope has not been signed yet.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "Envelope has not been signed yet" } } }
+          },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+    "/v0/signature-requests/{signatureRequestId}/events": {
+      "get": {
+        "summary": "Get signature request events",
+        "operationId": "getSignatureRequestEvents",
+        "description": "Retrieves the chronological list of events for a signature request, such as creation, sending, and completion.",
+        "tags": ["Signature Requests"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "signatureRequestId",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "The ID of the signature request.",
+            "example": "abc123xyz"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signature request events retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["signatureRequestEvents"],
+                  "properties": {
+                    "signatureRequestEvents": {
+                      "type": "array",
+                      "description": "List of events for the signature request.",
+                      "items": { "type": "object", "description": "A signature request event." }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequestError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedError" },
+          "403": { "$ref": "#/components/responses/ForbiddenError" },
+          "404": { "$ref": "#/components/responses/NotFoundError" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+    "/v0/redline-requests": {
+      "post": {
+        "summary": "Create a redline request",
+        "operationId": "createRedlineRequest",
+        "description": "Creates a new redline request for a template with specified members. Each member must have an email, displayName, and role. The template must have a DOCX source file available for redlining.",
+        "tags": ["Redlining"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["templateId", "members"],
+                "properties": {
+                  "templateId": {
+                    "type": "string",
+                    "description": "The ID of the template to create a redline request for.",
+                    "example": "abc123xyz"
+                  },
+                  "members": {
+                    "type": "array",
+                    "minItems": 1,
+                    "description": "Array of members participating in the redline request.",
+                    "items": { "$ref": "#/components/schemas/RedlineMemberInput" },
+                    "example": [
+                      { "email": "disclosingparty@example.com", "displayName": "John Doe", "role": "DisclosingParty" },
+                      { "email": "receivingparty@example.com", "displayName": "Jane Smith", "role": "ReceivingParty" }
+                    ]
+                  },
+                  "testMode": {
+                    "type": "boolean",
+                    "description": "Optional flag to enable test mode for the redline request. Defaults to false.",
+                    "example": false
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "description": "Optional metadata for the redline request.",
+                    "properties": {
+                      "subject": { "type": "string", "description": "The subject of the redline request.", "example": "Mutual NDA" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Redline request created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "redlineRequestId": {
+                      "type": "string",
+                      "description": "The unique identifier of the created redline request.",
+                      "example": "abc123xyz"
+                    },
+                    "templateId": {
+                      "type": "string",
+                      "description": "The ID of the new template created for the redline request.",
+                      "example": "def456uvw"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequestError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedError" },
+          "403": { "$ref": "#/components/responses/ForbiddenError" },
+          "404": { "$ref": "#/components/responses/NotFoundError" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      },
+      "get": {
+        "summary": "List redline requests",
+        "operationId": "listRedlineRequests",
+        "description": "Returns all redline requests for the authenticated client's organization, newest updated first. Optionally pass updatedSince to return only requests updated strictly after that instant (ISO-8601).",
+        "tags": ["Redlining"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "updatedSince",
+            "required": false,
+            "schema": { "type": "string", "format": "date-time" },
+            "description": "ISO-8601 timestamp; only redline requests updated strictly after this time are returned.",
+            "example": "2024-01-15T10:30:00.000Z"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Redline requests retrieved successfully (empty array if none match).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/RedlineRequest" }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequestError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedError" },
+          "403": { "$ref": "#/components/responses/ForbiddenError" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+    "/v0/redline-requests/{redlineRequestId}": {
+      "get": {
+        "summary": "Get a redline request",
+        "operationId": "getRedlineRequest",
+        "description": "Retrieves a single redline request by ID.",
+        "tags": ["Redlining"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "redlineRequestId",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "The ID of the redline request.",
+            "example": "abc123xyz"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Redline request retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RedlineRequest" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequestError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedError" },
+          "403": { "$ref": "#/components/responses/ForbiddenError" },
+          "404": { "$ref": "#/components/responses/NotFoundError" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+    "/v0/redline-requests/{redlineRequestId}/members": {
+      "put": {
+        "summary": "Update redline members",
+        "operationId": "putRedlineMembers",
+        "description": "Replaces or upserts the members for an existing redline request. Each member must have an email, displayName, and role.",
+        "tags": ["Redlining"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "redlineRequestId",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "The ID of the redline request to update members for.",
+            "example": "abc123xyz"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["members"],
+                "properties": {
+                  "members": {
+                    "type": "array",
+                    "minItems": 1,
+                    "description": "Array of members to set for the redline request (replaces existing).",
+                    "items": { "$ref": "#/components/schemas/RedlineMemberInput" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Redline members updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "members": {
+                      "type": "array",
+                      "description": "The updated list of redline members.",
+                      "items": { "$ref": "#/components/schemas/RedlineMember" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequestError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedError" },
+          "403": { "$ref": "#/components/responses/ForbiddenError" },
+          "404": { "$ref": "#/components/responses/NotFoundError" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+    "/v0/redline-requests/{redlineRequestId}/url": {
+      "post": {
+        "summary": "Create a redline URL",
+        "operationId": "createRedlineUrl",
+        "description": "Generates a redline URL for a specific member of a redline request. The member must already be part of the redline request. The URL opens the redlining editor for that member's turn.",
+        "tags": ["Redlining"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "redlineRequestId",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "The ID of the redline request.",
+            "example": "abc123xyz"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["memberEmail"],
+                "properties": {
+                  "memberEmail": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "Email address of the redline member the URL is for.",
+                    "example": "member@example.com"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Redline URL created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "redlineUrl": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "The generated redline URL for the member.",
+                      "example": "https://app.formabledocs.com/redlining/embedded/xyz789abc"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601 timestamp when the redline URL expires.",
+                      "example": "2024-01-16T10:30:00.000Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequestError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedError" },
+          "403": { "$ref": "#/components/responses/ForbiddenError" },
+          "404": { "$ref": "#/components/responses/NotFoundError" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+    "/v0/redline-requests/{redlineRequestId}/events": {
+      "get": {
+        "summary": "Get redline request events",
+        "operationId": "getRedlineRequestEvents",
+        "description": "Retrieves the chronological list of events for a redline request, such as turn changes and review requests.",
+        "tags": ["Redlining"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "redlineRequestId",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "The ID of the redline request.",
+            "example": "abc123xyz"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Redline request events retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["redlineRequestEvents"],
+                  "properties": {
+                    "redlineRequestEvents": {
+                      "type": "array",
+                      "description": "List of events for the redline request.",
+                      "items": { "type": "object", "description": "A redline request event." }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequestError" },
+          "401": { "$ref": "#/components/responses/UnauthorizedError" },
+          "403": { "$ref": "#/components/responses/ForbiddenError" },
+          "404": { "$ref": "#/components/responses/NotFoundError" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+    "/v0/billing": {
+      "get": {
+        "summary": "Get billing data",
+        "operationId": "getBilling",
+        "description": "Returns usage information for the authenticated client's organization.",
+        "tags": ["Billing"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Billing data retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["numberOfRedliningSessions"],
+                  "properties": {
+                    "numberOfRedliningSessions": {
+                      "type": "integer",
+                      "description": "The number of confirmed redlining sessions for the organization.",
+                      "example": 42
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UnauthorizedError" },
+          "403": { "$ref": "#/components/responses/ForbiddenError" },
+          "500": { "$ref": "#/components/responses/InternalServerError" }
+        }
+      }
+    },
+    "/v0/health": {
+      "get": {
+        "summary": "Health check",
+        "operationId": "healthCheck",
+        "description": "Returns the health status of the API server, including uptime and version information. This endpoint does not require authentication.",
+        "tags": ["Health"],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Server is healthy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "healthy" },
+                    "timestamp": { "type": "string", "format": "date-time", "description": "Current server timestamp in ISO format.", "example": "2024-01-15T10:30:00.000Z" },
+                    "uptime": { "type": "number", "description": "Server uptime in seconds.", "example": 3600.5 },
+                    "version": { "type": "string", "description": "API version.", "example": "1.0.0" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "OAuth 2.0 client credentials access token, passed as a Bearer token in the Authorization header."
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string", "description": "A human-readable error message." }
+        }
+      },
+      "Party": {
+        "type": "object",
+        "required": ["email", "name"],
+        "properties": {
+          "email": { "type": "string", "format": "email", "description": "Email address." },
+          "name": { "type": "string", "description": "Full name." }
+        }
+      },
+      "SignatureRequest": {
+        "type": "object",
+        "required": ["templateId", "signer", "sender", "status", "testMode"],
+        "properties": {
+          "templateId": { "type": "string", "description": "The template ID associated with the signature request.", "example": "tmpl_abc123" },
+          "signer": { "$ref": "#/components/schemas/Party" },
+          "sender": { "$ref": "#/components/schemas/Party" },
+          "status": { "type": "string", "enum": ["Created", "Completed"], "description": "Current status of the signature request.", "example": "Created" },
+          "testMode": { "type": "boolean", "description": "Whether the signature request is in test mode.", "example": false }
+        }
+      },
+      "RedlineMemberInput": {
+        "type": "object",
+        "required": ["email", "displayName", "role"],
+        "properties": {
+          "email": { "type": "string", "format": "email", "description": "Email address of the member.", "example": "member@example.com" },
+          "displayName": { "type": "string", "description": "Display name of the member.", "example": "John Doe" },
+          "role": { "$ref": "#/components/schemas/RedlineMemberRole" }
+        }
+      },
+      "RedlineMember": {
+        "type": "object",
+        "properties": {
+          "role": { "$ref": "#/components/schemas/RedlineMemberRole" },
+          "email": { "type": "string", "format": "email", "description": "Member email address." },
+          "displayName": { "type": "string", "description": "Optional display name for the member." }
+        }
+      },
+      "RedlineMemberRole": {
+        "type": "string",
+        "enum": ["DisclosingParty", "ReceivingParty", "DisclosingCounsel", "ReceivingCounsel"],
+        "description": "Role of the member in the redline request."
+      },
+      "RedlineRequest": {
+        "type": "object",
+        "required": ["templateId", "status", "members", "testMode", "currentRound"],
+        "properties": {
+          "templateId": { "type": "string", "description": "The template ID associated with the redline request.", "example": "tmpl_abc123" },
+          "status": {
+            "type": "string",
+            "enum": ["DisclosingPartyDraft", "DisclosingPartyRequestedReview", "DocumentReadyForSigning", "ReceivingPartyDraft", "ReceivingPartyOpened", "ReceivingPartyRequestedReview"],
+            "description": "Current status of the redline request."
+          },
+          "members": {
+            "type": "array",
+            "description": "List of members in the redline request.",
+            "items": { "$ref": "#/components/schemas/RedlineMember" }
+          },
+          "testMode": { "type": "boolean", "description": "Whether the redline request is in test mode." },
+          "currentRound": {
+            "type": "string",
+            "enum": ["Disclosing", "Receiving"],
+            "description": "The party whose turn it is in the current round."
+          }
+        }
+      }
+    },
+    "responses": {
+      "UnauthorizedError": {
+        "description": "Unauthorized - missing or invalid bearer token.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "Auth token not valid" } } }
+      },
+      "BadRequestError": {
+        "description": "Bad request - missing or invalid parameters.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "templateId is required" } } }
+      },
+      "ForbiddenError": {
+        "description": "Forbidden - the client is not authorized to perform this action.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "Client not authorized to perform this action" } } }
+      },
+      "NotFoundError": {
+        "description": "The requested resource was not found.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "Resource not found for id abc123xyz" } } }
+      },
+      "InternalServerError": {
+        "description": "Internal server error.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "Internal server error" } } }
+      }
+    }
+  }
+}

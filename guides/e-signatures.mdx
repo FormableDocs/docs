@@ -1,0 +1,142 @@
+---
+title: "E-signature workflow"
+description: "Send a document for signature, prefill fields, and retrieve the signed result."
+---
+
+The e-signature workflow turns a template into a signed document. This guide covers the full lifecycle: create a request, prefill fields, generate a signing URL, and download the completed PDF.
+
+## Overview
+
+<Steps>
+  <Step title="Create a signature request from a template" />
+  <Step title="Generate a signing URL and embed it" />
+  <Step title="Detect completion via events or status" />
+  <Step title="Download the signed envelope" />
+</Steps>
+
+## 1. Create a signature request
+
+A signature request needs a `templateId`, a `signer`, and a `sender`. See [Manage templates](/guides/templates) to create a template first.
+
+```bash
+curl --request POST \
+  --url https://formable-production.up.railway.app/api/v0/signature-requests \
+  --header "Authorization: Bearer $TOKEN" \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "templateId": "abc123xyz",
+    "signer": { "email": "signer@example.com", "name": "Jane Doe" },
+    "sender": { "email": "you@yourcompany.com", "name": "Your Company" }
+  }'
+```
+
+```json Response
+{ "signatureRequestId": "sr_456def" }
+```
+
+### Prefill fields
+
+To fill in values before the signer opens the document, pass a `fields` array. Each entry references a `fieldId` from the template and the `value` to set.
+
+```json
+{
+  "templateId": "abc123xyz",
+  "signer": { "email": "signer@example.com", "name": "Jane Doe" },
+  "sender": { "email": "you@yourcompany.com", "name": "Your Company" },
+  "fields": [
+    { "fieldId": "field_company_name", "value": "Acme Corporation" },
+    { "fieldId": "field_effective_date", "value": "2024-02-01" }
+  ]
+}
+```
+
+<Info>
+  Field IDs come from the template. Open the template's [editor URL](/guides/templates) to place fields and find their IDs. A `fieldId` that doesn't exist on the template returns a `400`.
+</Info>
+
+### Test mode
+
+While integrating, set `testMode: true` so the request doesn't count toward billing.
+
+```json
+{
+  "templateId": "abc123xyz",
+  "signer": { "email": "signer@example.com", "name": "Jane Doe" },
+  "sender": { "email": "you@yourcompany.com", "name": "Your Company" },
+  "testMode": true
+}
+```
+
+## 2. Generate a signing URL
+
+Create a signing URL for the signature request and embed it in your product. The URL expires **one hour** after creation, so generate it right before displaying it.
+
+```bash
+curl --request POST \
+  --url https://formable-production.up.railway.app/api/v0/signature-requests/sr_456def/url \
+  --header "Authorization: Bearer $TOKEN"
+```
+
+```json Response
+{
+  "signingUrl": "https://app.formabledocs.com/sign/embedded/xyz789abc",
+  "expiresAt": "2024-01-16T10:30:00.000Z"
+}
+```
+
+```html
+<iframe src="https://app.formabledocs.com/sign/embedded/xyz789abc" width="100%" height="800"></iframe>
+```
+
+<Warning>
+  A signing URL can't be created once the document is already completed — that request returns `409`.
+</Warning>
+
+## 3. Detect completion
+
+You have two ways to know when the signer is done:
+
+<AccordionGroup>
+  <Accordion title="Poll the signature request status" icon="magnifying-glass">
+    Fetch the [signature request](/api-reference/endpoint/get-signature-request) and check `status`. It moves from `Created` to `Completed`.
+
+    ```bash
+    curl --request GET \
+      --url https://formable-production.up.railway.app/api/v0/signature-requests/sr_456def \
+      --header "Authorization: Bearer $TOKEN"
+    ```
+  </Accordion>
+  <Accordion title="Read the event stream" icon="list">
+    Fetch [signature request events](/api-reference/endpoint/get-signature-request-events) for a chronological history of what happened, including sending and completion.
+
+    ```bash
+    curl --request GET \
+      --url https://formable-production.up.railway.app/api/v0/signature-requests/sr_456def/events \
+      --header "Authorization: Bearer $TOKEN"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<Tip>
+  To reconcile activity in bulk, use [List signature requests](/api-reference/endpoint/list-signature-requests) with the `updatedSince` query parameter to fetch only what changed since your last sync.
+</Tip>
+
+## 4. Download the signed envelope
+
+Once the document is `Completed`, retrieve a presigned URL to download the signed PDF.
+
+```bash
+curl --request GET \
+  --url https://formable-production.up.railway.app/api/v0/signature-requests/sr_456def/signed-envelope \
+  --header "Authorization: Bearer $TOKEN"
+```
+
+```json Response
+{
+  "signedEnvelopePresignedUrl": "https://s3.amazonaws.com/bucket/signed-envelope.pdf?..."
+}
+```
+
+<Note>
+  Requesting the signed envelope before signing is complete returns `409` with `"Envelope has not been signed yet"`.
+</Note>

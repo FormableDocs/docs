@@ -1,16 +1,22 @@
-# Mintlify Starter Kit
+# Formable API docs
 
-Use the starter kit to get your docs deployed and ready to customize.
+Documentation for the Formable API, built on [Mintlify](https://mintlify.com).
 
-Click the green **Use this template** button at the top of this repo to copy the Mintlify starter kit. The starter kit contains examples with
+- **Guides** — introduction, authentication, quickstart, core concepts, and workflow guides (`index.mdx`, `authentication.mdx`, `quickstart.mdx`, `concepts.mdx`, `guides/`).
+- **API Reference** — auto-generated from `api-reference/openapi.json`, with one MDX page per endpoint under `api-reference/endpoint/`.
+- **Navigation & branding** — configured in `docs.json`.
 
-- Guide pages
-- Navigation
-- Customizations
-- API reference pages
-- Use of popular components
+## Updating the API reference
 
-**[Follow the full quickstart guide](https://starter.mintlify.com/quickstart)**
+The reference pages render from the OpenAPI spec at `api-reference/openapi.json`. When the Formable API changes, update that spec (it mirrors the server's `swagger-docs.ts`), then add or adjust the matching MDX file in `api-reference/endpoint/` and its entry in `docs.json`.
+
+Validate changes with:
+
+```
+npx mint@latest validate
+npx mint@latest openapi-check api-reference/openapi.json
+npx mint@latest broken-links
+```
 
 ## AI-assisted writing
 

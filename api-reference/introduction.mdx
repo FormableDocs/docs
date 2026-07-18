@@ -1,0 +1,74 @@
+---
+title: "API reference"
+description: "REST endpoints for templates, signature requests, and redlining."
+---
+
+The Formable API is organized around a few core resources: **templates**, **signature requests**, and **redline requests**. It's a REST API with predictable, resource-oriented URLs, JSON request and response bodies, and standard HTTP status codes.
+
+<Card title="Try it live" icon="play" href="/api-reference/endpoint/create-signature-request" horizontal>
+  Every endpoint page includes a playground. Add your bearer token and send real requests from the docs.
+</Card>
+
+## Base URL
+
+All endpoints are served under `/api` and versioned with `/v0`.
+
+<CodeGroup>
+
+```text Production
+https://formable-production.up.railway.app/api
+```
+
+```text Local
+http://localhost:4000/api
+```
+
+</CodeGroup>
+
+## Authentication
+
+Every endpoint except the health check requires an OAuth 2.0 bearer token in the `Authorization` header. See [Authentication](/authentication) for how to obtain one.
+
+```bash
+Authorization: Bearer YOUR_ACCESS_TOKEN
+```
+
+## Response format
+
+Successful responses return JSON with a `200` status. Errors return a JSON object with a single `error` string:
+
+```json
+{
+  "error": "templateId is required"
+}
+```
+
+## Status codes
+
+| Code | Meaning |
+| --- | --- |
+| `200` | Success. |
+| `400` | Bad request — missing or invalid parameters. |
+| `401` | Unauthorized — missing or invalid bearer token. |
+| `403` | Forbidden — the token is valid but not authorized for this resource. |
+| `404` | Not found — the referenced resource doesn't exist. |
+| `409` | Conflict — the resource isn't in a valid state (for example, signing an already-completed document). |
+| `413` | Payload too large — the uploaded file exceeds 40MB. |
+| `500` | Internal server error. |
+
+## Resources
+
+<CardGroup cols={2}>
+  <Card title="Templates" icon="file-lines" href="/api-reference/endpoint/create-template">
+    Upload documents and generate editor URLs.
+  </Card>
+  <Card title="Signature Requests" icon="signature" href="/api-reference/endpoint/create-signature-request">
+    Send documents for e-signature and retrieve signed results.
+  </Card>
+  <Card title="Redlining" icon="pen-line" href="/api-reference/endpoint/create-redline-request">
+    Create and manage collaborative redline negotiations.
+  </Card>
+  <Card title="Billing" icon="receipt" href="/api-reference/endpoint/get-billing">
+    Retrieve usage information.
+  </Card>
+</CardGroup>

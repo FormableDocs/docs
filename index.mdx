@@ -1,20 +1,48 @@
 ---
-title: "Introduction"
-description: "Welcome to your project"
+title: "Formable API"
+description: "Embed e-signatures and collaborative document redlining directly into your product."
 ---
 
-Write a short description of your product here. What it does, who it's for, and what they can accomplish with it.
+The Formable API lets you add document workflows to your application without building them from scratch. Upload a document once as a **template**, then use it to collect signatures or negotiate revisions between two parties — all through a REST API and embeddable URLs.
 
-<Tip>
-  Ready to make this your own? Start by editing this page. Update your `docs.json` file to customize your site. Then fill out the [Quickstart](/quickstart) page.
-</Tip>
+<CardGroup cols={2}>
+  <Card title="Send for signature" icon="signature" href="/guides/e-signatures">
+    Turn a template into a signature request and get an embeddable signing URL in two calls.
+  </Card>
+  <Card title="Redline a contract" icon="pen-line" href="/guides/redlining">
+    Run a turn-based negotiation where two parties revise a DOCX contract until it's ready to sign.
+  </Card>
+  <Card title="Manage templates" icon="file-lines" href="/guides/templates">
+    Upload PDF and DOCX files and generate editor URLs to place fields.
+  </Card>
+  <Card title="API reference" icon="code" href="/api-reference/introduction">
+    Explore every endpoint with request and response schemas and a live playground.
+  </Card>
+</CardGroup>
 
-<Card title="Quickstart" icon="rocket" href="/quickstart">
-  This card links to the quickstart page in your project.
-</Card>
-<Card title="Components" icon="puzzle-piece" href="https://mintlify.com/docs/components">
-  Add cards, callouts, steps, tabs, and more to design and structure your pages.
-</Card>
-<Card title="Settings" icon="gear" href="https://mintlify.com/docs/organize/settings">
-  Set your site name, branding, and navigation in the `docs.json` file.
+## What you can build
+
+- **Embedded e-signature** — Send a document to a signer and drop the returned signing URL into an iframe. Retrieve the completed PDF when they're done.
+- **Embedded redlining** — Let two parties (a disclosing and a receiving party) exchange revisions to a DOCX contract in turns, with counsel invited as needed.
+- **Templates with prefilled fields** — Upload a document, place fields in the editor, then prefill values per signer at send time.
+
+## How it works
+
+<Steps>
+  <Step title="Create a template">
+    Upload a PDF or DOCX file with [Create a template](/api-reference/endpoint/create-template). Formable returns a `templateId` you'll reuse across requests.
+  </Step>
+  <Step title="Start a workflow">
+    Create a [signature request](/api-reference/endpoint/create-signature-request) or a [redline request](/api-reference/endpoint/create-redline-request) from the template.
+  </Step>
+  <Step title="Generate a URL">
+    Request an embeddable [signing URL](/api-reference/endpoint/create-signing-url) or [redline URL](/api-reference/endpoint/create-redline-url) and load it in an iframe.
+  </Step>
+  <Step title="Retrieve the result">
+    Poll [events](/api-reference/endpoint/get-signature-request-events) or fetch the [signed envelope](/api-reference/endpoint/get-signed-envelope) once complete.
+  </Step>
+</Steps>
+
+<Card title="Ready to make your first call?" icon="rocket" href="/quickstart" horizontal>
+  Follow the quickstart to authenticate and create your first signature request.
 </Card>

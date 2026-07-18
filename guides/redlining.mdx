@@ -1,0 +1,138 @@
+---
+title: "Redlining workflow"
+description: "Run a turn-based contract negotiation between two parties."
+---
+
+Redlining lets two parties negotiate revisions to a DOCX contract in turns. This guide walks through creating a redline request, generating member URLs, and tracking the negotiation until the document is ready to sign.
+
+<Info>
+  Redlining edits the underlying document, so the template **must have a DOCX source file**. Creating a redline request for a template without one returns `404`.
+</Info>
+
+## Roles
+
+A redline request has members, each with a role. The two core parties are set up front; counsel can be added later.
+
+| Role | Description |
+| --- | --- |
+| `DisclosingParty` | Originated the contract. |
+| `ReceivingParty` | Requests changes to the contract. |
+| `DisclosingCounsel` | Helps the disclosing party. |
+| `ReceivingCounsel` | Helps the receiving party. |
+
+## 1. Create a redline request
+
+Provide the `templateId` and at least one member. Each member needs an `email`, `displayName`, and `role`.
+
+```bash
+curl --request POST \
+  --url https://formable-production.up.railway.app/api/v0/redline-requests \
+  --header "Authorization: Bearer $TOKEN" \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "templateId": "abc123xyz",
+    "members": [
+      { "email": "legal@acme.com", "displayName": "Acme Legal", "role": "DisclosingParty" },
+      { "email": "counsel@client.com", "displayName": "Client Counsel", "role": "ReceivingParty" }
+    ],
+    "metadata": { "subject": "Mutual NDA" }
+  }'
+```
+
+```json Response
+{
+  "redlineRequestId": "rr_789ghi",
+  "templateId": "def456uvw"
+}
+```
+
+<Note>
+  The response `templateId` is a **new** template created for this negotiation — a copy that receives the redlining changes. Your original template is left untouched.
+</Note>
+
+The optional `metadata.subject` sets a subject line for the negotiation. Set `testMode: true` to keep the request out of billing while you integrate.
+
+## 2. Manage members
+
+Add or update members at any time — for example, to invite counsel — with [Update redline members](/api-reference/endpoint/put-redline-members). This replaces the member list, so send the full set.
+
+```bash
+curl --request PUT \
+  --url https://formable-production.up.railway.app/api/v0/redline-requests/rr_789ghi/members \
+  --header "Authorization: Bearer $TOKEN" \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "members": [
+      { "email": "legal@acme.com", "displayName": "Acme Legal", "role": "DisclosingParty" },
+      { "email": "counsel@client.com", "displayName": "Client Counsel", "role": "ReceivingParty" },
+      { "email": "outside@lawfirm.com", "displayName": "Outside Counsel", "role": "ReceivingCounsel" }
+    ]
+  }'
+```
+
+## 3. Generate a redline URL for a member
+
+Each member works on their turn through a member-specific redline URL. Pass the member's email — they must already be part of the request.
+
+```bash
+curl --request POST \
+  --url https://formable-production.up.railway.app/api/v0/redline-requests/rr_789ghi/url \
+  --header "Authorization: Bearer $TOKEN" \
+  --header 'Content-Type: application/json' \
+  --data '{ "memberEmail": "counsel@client.com" }'
+```
+
+```json Response
+{
+  "redlineUrl": "https://app.formabledocs.com/redlining/embedded/xyz789abc",
+  "expiresAt": "2024-01-16T10:30:00.000Z"
+}
+```
+
+Embed the URL in an iframe for that member:
+
+```html
+<iframe src="https://app.formabledocs.com/redlining/embedded/xyz789abc" width="100%" height="800"></iframe>
+```
+
+<Tip>
+  If it isn't the member's turn, the URL opens in a read-only "out of turn" view. Generate the URL just-in-time — it's short-lived.
+</Tip>
+
+## 4. Track the negotiation
+
+The `currentRound` field indicates whose turn it is (`Disclosing` or `Receiving`), and `status` tracks progress through the negotiation.
+
+```bash
+curl --request GET \
+  --url https://formable-production.up.railway.app/api/v0/redline-requests/rr_789ghi \
+  --header "Authorization: Bearer $TOKEN"
+```
+
+```json Response
+{
+  "templateId": "def456uvw",
+  "status": "ReceivingPartyRequestedReview",
+  "currentRound": "Disclosing",
+  "testMode": false,
+  "members": [
+    { "role": "DisclosingParty", "email": "legal@acme.com", "displayName": "Acme Legal" },
+    { "role": "ReceivingParty", "email": "counsel@client.com", "displayName": "Client Counsel" }
+  ]
+}
+```
+
+| Status | Meaning |
+| --- | --- |
+| `ReceivingPartyOpened` | The receiving party opened the document. |
+| `ReceivingPartyDraft` | The receiving party is drafting revisions. |
+| `ReceivingPartyRequestedReview` | Revisions sent to the disclosing party for review. |
+| `DisclosingPartyDraft` | The disclosing party is drafting revisions. |
+| `DisclosingPartyRequestedReview` | Revisions sent to the receiving party for review. |
+| `DocumentReadyForSigning` | All changes resolved; ready to sign. |
+
+For a full history of turn changes and review requests, read [redline request events](/api-reference/endpoint/get-redline-request-events). To sync many negotiations, use [List redline requests](/api-reference/endpoint/list-redline-requests) with `updatedSince`.
+
+## 5. Ready for signing
+
+When the negotiation reaches `DocumentReadyForSigning`, the finalized template can be sent through the [e-signature workflow](/guides/e-signatures) using the redline request's `templateId`.

@@ -1,0 +1,4 @@
+/* Enlarge the navbar logo (Mintlify default is h-6 / 24px). */
+img.nav-logo {
+  height: 2rem;
+}

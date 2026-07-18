@@ -1,0 +1,91 @@
+---
+title: "Manage templates"
+description: "Upload documents and place fields to reuse across signature and redline requests."
+---
+
+A template is the starting point for every Formable workflow. You upload a document once, place fields on it, and then reuse its `templateId` to send signature requests or start redline negotiations.
+
+## Supported files
+
+- **PDF** (`application/pdf`)
+- **DOCX** (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`)
+- **DOC** (`application/msword`)
+- Maximum size: **40MB**
+
+<Info>
+  Redlining requires a **DOCX** source file because it edits the underlying document. Upload DOCX if you plan to negotiate revisions.
+</Info>
+
+## 1. Upload a template
+
+Send the file as `multipart/form-data` with a `file` part and a `filename` field. Formable returns the `templateId` plus a ready-to-use editor URL.
+
+```bash
+curl --request POST \
+  --url https://formable-production.up.railway.app/api/v0/templates \
+  --header "Authorization: Bearer $TOKEN" \
+  --form 'file=@./agreement.docx' \
+  --form 'filename=agreement.docx'
+```
+
+```json Response
+{
+  "templateId": "abc123xyz",
+  "editTemplateAccess": {
+    "editUrl": "https://app.formabledocs.com/template-setup/abc123xyz",
+    "expiresAt": "2024-01-16T10:30:00.000Z"
+  }
+}
+```
+
+<Warning>
+  Files over 40MB return `413`. Unsupported file types return `400` with `"Unsupported file type, only pdf, docx, and doc are supported"`.
+</Warning>
+
+## 2. Place fields in the editor
+
+Open the `editUrl` in a browser to open the template editor, where you place and configure fields on the document:
+
+- **Signature** — where the signer signs
+- **Text** — free-form text input
+- **Date** — a date value
+- **Checkbox** — a boolean toggle
+- **Amount** — a monetary value
+
+Each field has an `id`. You reference these IDs when you [prefill fields](/guides/e-signatures#prefill-fields) on a signature request.
+
+<Note>
+  Editor URLs expire (by default one day after creation). Generate a fresh one anytime with the next step.
+</Note>
+
+## 3. Regenerate an editor URL
+
+If an editor URL has expired, mint a new one for the template.
+
+```bash
+curl --request POST \
+  --url https://formable-production.up.railway.app/api/v0/templates/abc123xyz/edit-url \
+  --header "Authorization: Bearer $TOKEN"
+```
+
+```json Response
+{
+  "editUrl": "https://app.formabledocs.com/template-setup/abc123xyz",
+  "expiresAt": "2024-01-16T10:30:00.000Z"
+}
+```
+
+<Warning>
+  You can only create an edit URL for templates owned by your organization. Other templates return `403`, and unknown IDs return `404`.
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Send for signature" icon="signature" href="/guides/e-signatures">
+    Use the template to collect a signature.
+  </Card>
+  <Card title="Start a redline" icon="pen-line" href="/guides/redlining">
+    Negotiate revisions on a DOCX template.
+  </Card>
+</CardGroup>
