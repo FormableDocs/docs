@@ -3,7 +3,15 @@ title: "E-signature workflow"
 description: "Send a document for signature, prefill fields, and retrieve the signed result."
 ---
 
-The e-signature workflow turns a template into a signed document. This guide covers the full lifecycle: create a request, prefill fields, generate a signing URL, and download the completed PDF.
+This guide walks through sending a document for someone to sign inside your product, then downloading the signed PDF when they're done.
+
+In Formable terms:
+
+- A **template** is the reusable document (for example an NDA or agreement) with signature and form fields placed on it.
+- A **signature request** is one send of that template to one signer — like mailing a filled-out copy for signature.
+- The **signed envelope** is the finished signed document you download after they complete signing.
+
+For a fuller glossary, see [Core concepts](/concepts).
 
 ## Overview
 
@@ -11,13 +19,19 @@ The e-signature workflow turns a template into a signed document. This guide cov
   <Step title="Create a signature request from a template" />
   <Step title="Generate a signing URL" />
   <Step title="Embed the signing URL in an iframe" />
-  <Step title="Detect completion via events or status" />
-  <Step title="Download the signed envelope" />
+  <Step title="Detect when the signer finishes" />
+  <Step title="Download the signed PDF" />
 </Steps>
 
 ## 1. Create a signature request
 
-A signature request needs a `templateId`, a `signer`, and a `sender`. See [Manage templates](/guides/templates) to create a template first.
+Start from a template you've already uploaded and prepared. If you don't have one yet, see [Manage templates](/guides/templates).
+
+A signature request needs:
+
+- `templateId` — which document to send
+- `signer` — who will sign (`email` + `name`)
+- `sender` — who is sending it (`email` + `name`)
 
 ```bash
 curl --request POST \
@@ -35,9 +49,11 @@ curl --request POST \
 { "signatureRequestId": "sr_456def" }
 ```
 
+Save the `signatureRequestId`. You'll use it to generate a signing URL, track progress, and download the signed PDF.
+
 ### Prefill fields
 
-To fill in values before the signer opens the document, pass a `fields` array. Each entry references a `fieldId` from the template and the `value` to set.
+Templates can include fields beyond the signature itself — company name, dates, checkboxes, and so on. To fill those in before the signer opens the document, pass a `fields` array. Each entry sets a `value` on a `fieldId` from the template.
 
 ```json
 {
@@ -52,7 +68,7 @@ To fill in values before the signer opens the document, pass a `fields` array. E
 ```
 
 <Info>
-  Field IDs come from the template. Open the template's [editor URL](/guides/templates) to place fields and find their IDs. A `fieldId` that doesn't exist on the template returns a `400`.
+  Field IDs come from the template. Open the template's [editor URL](/guides/templates) to place fields and copy their IDs. A `fieldId` that doesn't exist on the template returns a `400`.
 </Info>
 
 ### Test mode
@@ -70,7 +86,7 @@ While integrating, set `testMode: true` so the request doesn't count toward bill
 
 ## 2. Generate a signing URL
 
-Create a signing URL for the signature request. The URL expires **one hour** after creation, so generate it right before displaying it.
+A **signing URL** is a short-lived link that opens the signing experience for this signature request. It expires **one hour** after creation, so generate it right before you show it to the signer.
 
 ```bash
 curl --request POST \
@@ -91,7 +107,7 @@ curl --request POST \
 
 ## 3. Embed the signing URL
 
-Once you've generated a URL from the [Create a signing URL](/api-reference/endpoint/create-signing-url) API, embed the returned `signingUrl` in an `iframe` to present the signing experience directly inside your product.
+Embed the `signingUrl` in an `iframe` so the signer can complete the document without leaving your product.
 
 ```html
 <iframe
@@ -157,9 +173,24 @@ function SigningFrame({ signatureRequestId }) {
 
 ## 4. Detect completion
 
-You have two ways to know when the signer is done:
+When the signer finishes, the signature request `status` becomes `Completed`. You have three ways to learn that:
 
 <AccordionGroup>
+  <Accordion title="Listen for the document_signed webhook" icon="bell">
+    Configure a [webhook endpoint](/webhooks/overview) and handle the [`document_signed`](/webhooks/events#document_signed) event. Formable pushes this once signing is complete, so you can react without polling.
+
+    ```json
+    {
+      "event": {
+        "event_type": "document_signed",
+        "event_category": "signing"
+      },
+      "signing": {
+        "signature_request_id": "sr_456def"
+      }
+    }
+    ```
+  </Accordion>
   <Accordion title="Poll the signature request status" icon="magnifying-glass">
     Fetch the [signature request](/api-reference/endpoint/get-signature-request) and check `status`. It moves from `Created` to `Completed`.
 
@@ -181,12 +212,12 @@ You have two ways to know when the signer is done:
 </AccordionGroup>
 
 <Tip>
-  To reconcile activity in bulk, use [List signature requests](/api-reference/endpoint/list-signature-requests) with the `updatedSince` query parameter to fetch only what changed since your last sync.
+  Prefer the webhook for near real-time handling. Use [List signature requests](/api-reference/endpoint/list-signature-requests) with `updatedSince`, or the event stream, to reconcile anything you missed.
 </Tip>
 
-## 5. Download the signed envelope
+## 5. Download the signed PDF
 
-Once the document is `Completed`, retrieve a presigned URL to download the signed PDF.
+Once status is `Completed`, fetch a temporary download URL for the signed PDF. In the API this is called the **signed envelope** — the completed document with the signature applied.
 
 ```bash
 curl --request GET \
@@ -199,6 +230,8 @@ curl --request GET \
   "signedEnvelopePresignedUrl": "https://s3.amazonaws.com/bucket/signed-envelope.pdf?..."
 }
 ```
+
+Open or download that URL promptly; it is a short-lived presigned link to the PDF.
 
 <Note>
   Requesting the signed envelope before signing is complete returns `409` with `"Envelope has not been signed yet"`.
