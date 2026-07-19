@@ -23,11 +23,16 @@
             ]
           },
           {
-            "group": "Workflows",
+            "group": "E-signatures",
             "pages": [
               "guides/e-signatures",
-              "guides/redlining",
               "guides/templates"
+            ]
+          },
+          {
+            "group": "Redlining",
+            "pages": [
+              "guides/redlining"
             ]
           },
           {

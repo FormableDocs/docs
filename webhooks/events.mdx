@@ -3,7 +3,7 @@ title: "Event catalog"
 description: "Every webhook event type and its payload schema."
 ---
 
-This page lists every event Formable sends to your webhook endpoint. Events fall into two categories: **signing** and **redlining**.
+This page lists every event Formable sends to your webhook endpoint. Most integrations only need **signing** events (`document_viewed`, `document_signed`). **Redlining** events are listed below for the optional negotiation workflow.
 
 Every payload shares the same top-level shape — an `event` metadata object plus a category-specific object:
 

@@ -1,12 +1,12 @@
 ---
 title: "Webhooks overview"
-description: "Receive real-time notifications when documents are signed, viewed, or redlined."
+description: "Receive real-time notifications when documents are viewed or signed."
 ---
 
-Webhooks let Formable notify your application the moment something happens — a document is signed, a redline turn ends, a comment is added — without you having to poll the API. When an event occurs, Formable sends an HTTP `POST` request to a URL you provide.
+Webhooks let Formable notify your application the moment something happens — for example a document is viewed or signed — without you having to poll the API. When an event occurs, Formable sends an HTTP `POST` request to a URL you provide.
 
 <Info>
-  Prefer webhooks over polling for reacting to activity in near real time. You can still use the [signature request events](/api-reference/endpoint/get-signature-request-events) and [redline request events](/api-reference/endpoint/get-redline-request-events) endpoints to reconcile or backfill.
+  Prefer webhooks over polling for reacting to activity in near real time. You can still use [signature request events](/api-reference/endpoint/get-signature-request-events) to reconcile or backfill. If you use redlining, the same webhook endpoint also receives redlining events.
 </Info>
 
 ## How delivery works
@@ -58,7 +58,7 @@ Webhook endpoints are configured per organization by the Formable team.
 </Steps>
 
 <Note>
-  Each organization has **one** webhook URL that receives **all** event types across both signing and redlining. There is currently no per-event-type subscription filtering — inspect `event.event_type` in your handler to decide what to act on.
+  Each organization has **one** webhook URL. For e-signing, handle `document_viewed` and `document_signed`. The same endpoint also receives redlining events if you use that workflow — inspect `event.event_type` to decide what to act on.
 </Note>
 
 ## Respond quickly

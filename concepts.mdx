@@ -1,21 +1,22 @@
 ---
 title: "Core concepts"
-description: "The key objects and terms you'll work with in the Formable API."
+description: "The key objects and terms you'll work with when embedding e-signatures."
 ---
 
-Formable has two main workflows — **e-signatures** and **redlining** — that both start from a **template**. This page explains the objects you'll reference throughout the API.
+Most Formable integrations use **e-signatures**. You upload a reusable **template**, create a **signature request** for one signer, embed a **signing URL**, then download the **signed envelope** when they're done.
 
 ## Templates
 
-A **template** is a document you've uploaded (PDF or DOCX) along with the fields placed on it. Templates are reusable: you upload once, then create many signature or redline requests from the same `templateId`.
+A **template** is a document you've uploaded (PDF or DOCX) with fields placed on it — for example signature, text, date, checkbox, or amount. Templates are reusable: upload once, then create many signature requests from the same `templateId`.
 
-- Create a template by uploading a file to [Create a template](/api-reference/endpoint/create-template).
-- Place fields (signature, text, date, checkbox, amount) using the **editor URL** returned on creation, or fetch a fresh one with [Create a template edit URL](/api-reference/endpoint/create-template-edit-url).
-- Redlining requires the template to have a **DOCX** source file, since redlining edits the underlying document.
+- Create a template with [Create a template](/api-reference/endpoint/create-template).
+- Place fields using the **editor URL** returned on creation, or fetch a fresh one with [Create a template edit URL](/api-reference/endpoint/create-template-edit-url).
+
+See [Manage templates](/guides/templates) for the full workflow.
 
 ## Signature requests
 
-A **signature request** represents one document sent to one signer. It captures the `templateId`, the `signer`, the `sender`, and a `status`.
+A **signature request** is one send of a template to one signer. It captures the `templateId`, the `signer`, the `sender`, and a `status`.
 
 | Field | Description |
 | --- | --- |
@@ -24,59 +25,33 @@ A **signature request** represents one document sent to one signer. It captures 
 | `status` | `Created` when made, `Completed` once signed. |
 | `testMode` | When `true`, the request doesn't count toward billing. |
 
-To let someone sign, you generate a short-lived **signing URL** from the signature request. Once signing finishes, the signed document is available as a **signed envelope** (a presigned download URL).
+To let someone sign, generate a short-lived **signing URL** from the signature request and embed it in an iframe. When signing finishes, download the **signed envelope** — a temporary URL to the completed PDF.
 
 <Info>
-  An **envelope** is the internal record of a document that has been enriched with a recipient and can be signed. As an API consumer, you interact with signature requests; the envelope is what produces the final signed PDF.
+  An **envelope** is Formable's internal record of a document prepared for a recipient. As an API consumer you work with signature requests; the signed envelope endpoint is how you get the final PDF.
 </Info>
 
-## Redline requests
+## Signing URLs are short-lived and embeddable
 
-A **redline request** represents a contract being negotiated between two parties. Instead of signing, members exchange revisions to a DOCX document in **turns** until it's ready for signing.
-
-### Members and roles
-
-Every redline request has **members**, each with a `role`:
-
-| Role | Who they are |
-| --- | --- |
-| `DisclosingParty` | The party that originated the contract. |
-| `ReceivingParty` | The party requesting changes to the contract. |
-| `DisclosingCounsel` | Someone helping the disclosing party (invited later). |
-| `ReceivingCounsel` | Someone helping the receiving party (invited later). |
-
-### Rounds and status
-
-Redlining is turn-based. The `currentRound` field tells you whose turn it is (`Disclosing` or `Receiving`), and `status` tracks where the negotiation stands:
-
-| Status | Meaning |
-| --- | --- |
-| `ReceivingPartyOpened` | The receiving party opened the document. |
-| `ReceivingPartyDraft` | The receiving party is drafting revisions. |
-| `ReceivingPartyRequestedReview` | The receiving party sent revisions back for review. |
-| `DisclosingPartyDraft` | The disclosing party is drafting revisions. |
-| `DisclosingPartyRequestedReview` | The disclosing party sent revisions back for review. |
-| `DocumentReadyForSigning` | All changes resolved; the document is ready to sign. |
-
-To let a member work on their turn, you generate a **redline URL** for that member's email.
-
-## URLs are short-lived and embeddable
-
-Both signing URLs and redline URLs are meant to be **embedded in an iframe** in your own product. They expire, so generate them on demand right before you display them rather than storing them.
+Signing URLs are meant to be **embedded in an iframe** in your own product. They expire (typically after one hour), so generate them on demand right before you display them rather than storing them.
 
 <Warning>
-  Generate signing and redline URLs from your backend and pass them to the client just-in-time. Never expose your API credentials in client-side code.
+  Generate signing URLs from your backend and pass them to the client just-in-time. Never expose your API credentials in client-side code.
 </Warning>
 
 ## Test mode
 
-Both signature requests and redline requests accept a `testMode` flag. Use it while integrating so your activity doesn't count toward billing or trigger production behavior.
+Signature requests accept a `testMode` flag. Use it while integrating so activity doesn't count toward billing.
 
 ## Events
 
-Every workflow records **events** so you can track progress. You can receive them two ways:
+Track signing progress two ways:
 
-- **Push** — configure a [webhook](/webhooks/overview) to get notified in real time when events occur.
-- **Pull** — poll [signature request events](/api-reference/endpoint/get-signature-request-events) and [redline request events](/api-reference/endpoint/get-redline-request-events) to reconcile state.
+- **Push** — configure a [webhook](/webhooks/overview) for real-time events such as `document_viewed` and `document_signed`.
+- **Pull** — poll [signature request events](/api-reference/endpoint/get-signature-request-events) or check the signature request `status` to reconcile state.
 
-Use webhooks to react to state changes such as a document being signed or a redline turn ending, and use the polling endpoints to backfill anything missed.
+Prefer webhooks for reacting in near real time, and use polling to backfill anything missed.
+
+## Redlining (optional)
+
+Most integrations don't need this. [Redlining](/guides/redlining) is a separate workflow for negotiating a DOCX contract between two parties before signing. It uses **redline requests**, member roles, and turn-based rounds — see that guide when you're ready.

@@ -1,48 +1,51 @@
 ---
 title: "Formable API"
-description: "Embed e-signatures and collaborative document redlining directly into your product."
+description: "Embed e-signatures into your product with a REST API and embeddable signing URLs."
 ---
 
-The Formable API lets you add document workflows to your application without building them from scratch. Upload a document once as a **template**, then use it to collect signatures or negotiate revisions between two parties — all through a REST API and embeddable URLs.
+The Formable API lets you collect signatures inside your application without building the signing experience from scratch. Upload a document once as a **template**, send it as a **signature request**, and embed a short-lived signing URL in an iframe.
 
 <CardGroup cols={2}>
-  <Card title="Send for signature" icon="signature" href="/guides/e-signatures">
-    Turn a template into a signature request and get an embeddable signing URL in two calls.
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Authenticate and create your first signature request end to end.
   </Card>
-  <Card title="Redline a contract" icon="pen-line" href="/guides/redlining">
-    Run a turn-based negotiation where two parties revise a DOCX contract until it's ready to sign.
+  <Card title="E-signature workflow" icon="signature" href="/guides/e-signatures">
+    Prefill fields, embed signing, detect completion, and download the signed PDF.
   </Card>
   <Card title="Manage templates" icon="file-lines" href="/guides/templates">
-    Upload PDF and DOCX files and generate editor URLs to place fields.
+    Upload PDF and DOCX files and place signature and form fields in the editor.
   </Card>
   <Card title="Listen with webhooks" icon="bell" href="/webhooks/overview">
-    Get real-time notifications when documents are signed, viewed, or redlined.
+    Get notified in real time when a document is viewed or signed.
   </Card>
 </CardGroup>
 
 ## What you can build
 
-- **Embedded e-signature** — Send a document to a signer and drop the returned signing URL into an iframe. Retrieve the completed PDF when they're done.
-- **Embedded redlining** — Let two parties (a disclosing and a receiving party) exchange revisions to a DOCX contract in turns, with counsel invited as needed.
-- **Templates with prefilled fields** — Upload a document, place fields in the editor, then prefill values per signer at send time.
+- **Embedded e-signature** — Send a document to a signer, drop the signing URL into an iframe, and retrieve the completed PDF when they're done.
+- **Templates with prefilled fields** — Upload a document, place fields in the editor, then set values per signer at send time.
 
 ## How it works
 
 <Steps>
   <Step title="Create a template">
-    Upload a PDF or DOCX file with [Create a template](/api-reference/endpoint/create-template). Formable returns a `templateId` you'll reuse across requests.
+    Upload a PDF or DOCX with [Create a template](/api-reference/endpoint/create-template). Formable returns a `templateId` you reuse for every send.
   </Step>
-  <Step title="Start a workflow">
-    Create a [signature request](/api-reference/endpoint/create-signature-request) or a [redline request](/api-reference/endpoint/create-redline-request) from the template.
+  <Step title="Create a signature request">
+    Start a [signature request](/api-reference/endpoint/create-signature-request) from the template with a signer and sender.
   </Step>
-  <Step title="Generate a URL">
-    Request an embeddable [signing URL](/api-reference/endpoint/create-signing-url) or [redline URL](/api-reference/endpoint/create-redline-url) and load it in an iframe.
+  <Step title="Generate a signing URL">
+    Request an embeddable [signing URL](/api-reference/endpoint/create-signing-url) and load it in an iframe in your product.
   </Step>
-  <Step title="Retrieve the result">
-    Poll [events](/api-reference/endpoint/get-signature-request-events) or fetch the [signed envelope](/api-reference/endpoint/get-signed-envelope) once complete.
+  <Step title="Retrieve the signed PDF">
+    When signing finishes, fetch the [signed envelope](/api-reference/endpoint/get-signed-envelope), or listen for the [`document_signed`](/webhooks/events#document_signed) webhook.
   </Step>
 </Steps>
 
 <Card title="Ready to make your first call?" icon="rocket" href="/quickstart" horizontal>
   Follow the quickstart to authenticate and create your first signature request.
 </Card>
+
+## Also available: redlining
+
+If you need turn-based contract negotiation before signing, Formable also offers a [redlining workflow](/guides/redlining). Most integrations only need e-signatures — you can ignore redlining until you need it.
