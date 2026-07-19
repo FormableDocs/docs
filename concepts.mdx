@@ -74,9 +74,9 @@ Both signature requests and redline requests accept a `testMode` flag. Use it wh
 
 ## Events
 
-Every workflow records **events** you can retrieve to track progress:
+Every workflow records **events** so you can track progress. You can receive them two ways:
 
-- [Signature request events](/api-reference/endpoint/get-signature-request-events)
-- [Redline request events](/api-reference/endpoint/get-redline-request-events)
+- **Push** — configure a [webhook](/webhooks/overview) to get notified in real time when events occur.
+- **Pull** — poll [signature request events](/api-reference/endpoint/get-signature-request-events) and [redline request events](/api-reference/endpoint/get-redline-request-events) to reconcile state.
 
-Poll these to react to state changes such as a document being signed or a turn ending.
+Use webhooks to react to state changes such as a document being signed or a redline turn ending, and use the polling endpoints to backfill anything missed.

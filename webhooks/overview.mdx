@@ -1,0 +1,101 @@
+---
+title: "Webhooks overview"
+description: "Receive real-time notifications when documents are signed, viewed, or redlined."
+---
+
+Webhooks let Formable notify your application the moment something happens — a document is signed, a redline turn ends, a comment is added — without you having to poll the API. When an event occurs, Formable sends an HTTP `POST` request to a URL you provide.
+
+<Info>
+  Prefer webhooks over polling for reacting to activity in near real time. You can still use the [signature request events](/api-reference/endpoint/get-signature-request-events) and [redline request events](/api-reference/endpoint/get-redline-request-events) endpoints to reconcile or backfill.
+</Info>
+
+## How delivery works
+
+When an event fires, Formable sends a single HTTP request to your endpoint:
+
+| Property | Value |
+| --- | --- |
+| Method | `POST` |
+| Content-Type | `application/json` |
+| Body | The [event payload](/webhooks/events) as JSON |
+| Signature header | `Content-Sha256` — a base64 HMAC-SHA256 of the raw body |
+| Timeout | 10 seconds |
+| Expected response | HTTP `200` |
+
+The request body **is** the event object — it is not wrapped in an envelope. Every payload has the same top-level shape:
+
+```json
+{
+  "event": {
+    "event_id": "p-1phZC6_oU8qS191gsLT",
+    "event_category": "signing",
+    "event_type": "document_signed",
+    "event_time": 1777039156023
+  },
+  "signing": {
+    "signature_request_id": "YfdkOH7dVtaGzl-egS6NI"
+  }
+}
+```
+
+- `event.event_id` — a unique ID for this delivery. Use it for [idempotency](#idempotency).
+- `event.event_category` — `signing` or `redlining`.
+- `event.event_type` — the specific event, for example `document_signed`. See the [event catalog](/webhooks/events).
+- `event.event_time` — when the event occurred, in **milliseconds** since the Unix epoch.
+- A category-specific object (`signing` or `redlining`) carries the event details.
+
+## Register an endpoint
+
+Webhook endpoints are configured per organization by the Formable team.
+
+<Steps>
+  <Step title="Send us your URL">
+    Contact [support@formabledocs.com](mailto:support@formabledocs.com) with the HTTPS URL that should receive events.
+  </Step>
+  <Step title="Receive your signing secret">
+    We provision a signing secret for your endpoint and share it securely. Store it as a secret in your environment — you'll use it to [verify signatures](/webhooks/verifying-signatures).
+  </Step>
+</Steps>
+
+<Note>
+  Each organization has **one** webhook URL that receives **all** event types across both signing and redlining. There is currently no per-event-type subscription filtering — inspect `event.event_type` in your handler to decide what to act on.
+</Note>
+
+## Respond quickly
+
+Return a `200` status code as soon as you've received the event. If you have heavy work to do (updating records, sending emails, syncing data), enqueue it and process it asynchronously so you can respond within the 10-second timeout.
+
+<Warning>
+  Any response other than `200`, or a response that takes longer than 10 seconds, is treated as a failed delivery.
+</Warning>
+
+## Retries
+
+Formable does **not** automatically retry failed deliveries today. Failures are logged and monitored on our side. To stay resilient:
+
+- Make your endpoint highly available and fast to respond.
+- Use the [events endpoints](/api-reference/endpoint/get-signature-request-events) to reconcile any events you may have missed during downtime.
+
+## Idempotency
+
+Design your handler to be idempotent. Because a delivery could theoretically arrive more than once, track the `event.event_id` you've already processed and skip duplicates.
+
+```javascript
+if (await alreadyProcessed(payload.event.event_id)) {
+  return res.sendStatus(200);
+}
+await handleEvent(payload);
+await markProcessed(payload.event.event_id);
+res.sendStatus(200);
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Verify signatures" icon="shield-check" href="/webhooks/verifying-signatures">
+    Confirm each request genuinely came from Formable.
+  </Card>
+  <Card title="Event catalog" icon="list" href="/webhooks/events">
+    Every event type and its payload schema.
+  </Card>
+</CardGroup>

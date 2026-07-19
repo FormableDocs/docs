@@ -1,0 +1,112 @@
+---
+title: "Verifying signatures"
+description: "Confirm that a webhook request genuinely came from Formable."
+---
+
+Every webhook request includes a signature so you can verify it was sent by Formable and wasn't tampered with in transit. Always verify the signature before acting on a webhook.
+
+## How signing works
+
+Formable computes an **HMAC-SHA256** over the exact raw JSON body of the request, using your endpoint's signing secret as the key, and encodes the result as **base64**. That value is sent in the `Content-Sha256` header.
+
+<Info>
+  Your signing secret is provided as a **base64-encoded string**. Decode it to raw bytes and use those bytes as the HMAC key.
+</Info>
+
+To verify a request:
+
+<Steps>
+  <Step title="Read the raw body">
+    Capture the request body exactly as received, before any JSON parsing or re-serialization. Re-serializing can change whitespace or key order and break verification.
+  </Step>
+  <Step title="Compute the expected signature">
+    HMAC-SHA256 the raw body using the base64-decoded secret as the key, then base64-encode the digest.
+  </Step>
+  <Step title="Compare">
+    Compare your computed value with the `Content-Sha256` header using a constant-time comparison. If they match, the request is authentic.
+  </Step>
+</Steps>
+
+## Examples
+
+<CodeGroup>
+
+```javascript Node.js (Express)
+import express from "express";
+import crypto from "crypto";
+
+const app = express();
+
+// Capture the raw body so the signature is computed over the exact bytes.
+app.use("/webhooks/formable", express.raw({ type: "application/json" }));
+
+app.post("/webhooks/formable", (req, res) => {
+  const received = req.header("Content-Sha256");
+  const secret = Buffer.from(process.env.FORMABLE_WEBHOOK_SECRET, "base64");
+
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update(req.body) // req.body is a Buffer of the raw bytes
+    .digest("base64");
+
+  const valid =
+    received &&
+    expected.length === received.length &&
+    crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(received));
+
+  if (!valid) {
+    return res.status(401).send("Invalid signature");
+  }
+
+  const event = JSON.parse(req.body.toString("utf8"));
+  // handle event...
+  res.sendStatus(200);
+});
+```
+
+```python Python (Flask)
+import base64
+import hashlib
+import hmac
+import os
+
+from flask import Flask, request, abort
+
+app = Flask(__name__)
+
+@app.post("/webhooks/formable")
+def formable_webhook():
+    received = request.headers.get("Content-Sha256", "")
+    secret = base64.b64decode(os.environ["FORMABLE_WEBHOOK_SECRET"])
+
+    # request.get_data() returns the exact raw bytes of the body.
+    digest = hmac.new(secret, request.get_data(), hashlib.sha256).digest()
+    expected = base64.b64encode(digest).decode()
+
+    if not hmac.compare_digest(expected, received):
+        abort(401)
+
+    event = request.get_json()
+    # handle event...
+    return "", 200
+```
+
+</CodeGroup>
+
+## Common pitfalls
+
+<AccordionGroup>
+  <Accordion title="Using the parsed body instead of the raw body" icon="triangle-exclamation">
+    Frameworks that auto-parse JSON discard the original bytes. Re-serializing the parsed object almost always produces a slightly different string (whitespace, key order), so the HMAC won't match. Always sign over the raw request body.
+  </Accordion>
+  <Accordion title="Forgetting to base64-decode the secret" icon="key">
+    The secret is a base64 string. Use its decoded bytes as the HMAC key — don't pass the base64 string directly.
+  </Accordion>
+  <Accordion title="Non-constant-time comparison" icon="clock">
+    Compare signatures with a constant-time function (`crypto.timingSafeEqual`, `hmac.compare_digest`) to avoid timing attacks.
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  Keep your signing secret confidential and store it as an environment secret. If you believe it has been exposed, contact [support@formabledocs.com](mailto:support@formabledocs.com) to rotate it.
+</Warning>

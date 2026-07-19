@@ -29,6 +29,14 @@
               "guides/redlining",
               "guides/templates"
             ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "webhooks/overview",
+              "webhooks/verifying-signatures",
+              "webhooks/events"
+            ]
           }
         ]
       },

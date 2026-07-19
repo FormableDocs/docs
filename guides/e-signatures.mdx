@@ -9,7 +9,8 @@ The e-signature workflow turns a template into a signed document. This guide cov
 
 <Steps>
   <Step title="Create a signature request from a template" />
-  <Step title="Generate a signing URL and embed it" />
+  <Step title="Generate a signing URL" />
+  <Step title="Embed the signing URL in an iframe" />
   <Step title="Detect completion via events or status" />
   <Step title="Download the signed envelope" />
 </Steps>
@@ -69,7 +70,7 @@ While integrating, set `testMode: true` so the request doesn't count toward bill
 
 ## 2. Generate a signing URL
 
-Create a signing URL for the signature request and embed it in your product. The URL expires **one hour** after creation, so generate it right before displaying it.
+Create a signing URL for the signature request. The URL expires **one hour** after creation, so generate it right before displaying it.
 
 ```bash
 curl --request POST \
@@ -84,15 +85,77 @@ curl --request POST \
 }
 ```
 
-```html
-<iframe src="https://app.formabledocs.com/sign/embedded/xyz789abc" width="100%" height="800"></iframe>
-```
-
 <Warning>
   A signing URL can't be created once the document is already completed — that request returns `409`.
 </Warning>
 
-## 3. Detect completion
+## 3. Embed the signing URL
+
+Once you've generated a URL from the [Create a signing URL](/api-reference/endpoint/create-signing-url) API, embed the returned `signingUrl` in an `iframe` to present the signing experience directly inside your product.
+
+```html
+<iframe
+  src="https://app.formabledocs.com/sign/embedded/xyz789abc"
+  width="100%"
+  height="800"
+  allow="fullscreen"
+  style="border: none;"
+></iframe>
+```
+
+Because the signing URL is short-lived and unique per signature request, request it from your **backend** and pass it to the page just before rendering the iframe:
+
+<CodeGroup>
+
+```javascript React
+function SigningFrame({ signatureRequestId }) {
+  const [signingUrl, setSigningUrl] = useState(null);
+
+  useEffect(() => {
+    // Call your own backend, which requests the signing URL from Formable
+    // using your API token, then returns it to the client.
+    fetch(`/api/formable/signing-url?signatureRequestId=${signatureRequestId}`)
+      .then((res) => res.json())
+      .then((data) => setSigningUrl(data.signingUrl));
+  }, [signatureRequestId]);
+
+  if (!signingUrl) return <p>Loading…</p>;
+
+  return (
+    <iframe
+      src={signingUrl}
+      width="100%"
+      height="800"
+      allow="fullscreen"
+      style={{ border: "none" }}
+      title="Sign document"
+    />
+  );
+}
+```
+
+```html Plain HTML
+<!-- Server-side, inject the freshly generated signingUrl into the src -->
+<iframe
+  src="{{ signingUrl }}"
+  width="100%"
+  height="800"
+  allow="fullscreen"
+  style="border: none;"
+></iframe>
+```
+
+</CodeGroup>
+
+<Warning>
+  Never call the Formable API with your token from the browser. Generate the signing URL on your server and hand only the resulting URL to the client.
+</Warning>
+
+<Tip>
+  Give the iframe enough height (around `800px`) so signers don't have to scroll within a small frame. Regenerate the URL if the signer returns after it has expired.
+</Tip>
+
+## 4. Detect completion
 
 You have two ways to know when the signer is done:
 
@@ -121,7 +184,7 @@ You have two ways to know when the signer is done:
   To reconcile activity in bulk, use [List signature requests](/api-reference/endpoint/list-signature-requests) with the `updatedSince` query parameter to fetch only what changed since your last sync.
 </Tip>
 
-## 4. Download the signed envelope
+## 5. Download the signed envelope
 
 Once the document is `Completed`, retrieve a presigned URL to download the signed PDF.
 

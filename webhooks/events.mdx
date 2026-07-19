@@ -1,0 +1,326 @@
+---
+title: "Event catalog"
+description: "Every webhook event type and its payload schema."
+---
+
+This page lists every event Formable sends to your webhook endpoint. Events fall into two categories: **signing** and **redlining**.
+
+Every payload shares the same top-level shape — an `event` metadata object plus a category-specific object:
+
+```json
+{
+  "event": {
+    "event_id": "string",
+    "event_category": "signing | redlining",
+    "event_type": "string",
+    "event_time": 1777039156023
+  },
+  "signing": { }
+}
+```
+
+<ResponseField name="event.event_id" type="string">
+  Unique identifier for this delivery. Use it for idempotency.
+</ResponseField>
+<ResponseField name="event.event_category" type="string">
+  Either `signing` or `redlining`.
+</ResponseField>
+<ResponseField name="event.event_type" type="string">
+  The specific event type, listed below.
+</ResponseField>
+<ResponseField name="event.event_time" type="number">
+  When the event occurred, in **milliseconds** since the Unix epoch.
+</ResponseField>
+
+---
+
+## Signing events
+
+Signing events carry a `signing` object and reference a [signature request](/guides/e-signatures).
+
+<ResponseField name="signing.signature_request_id" type="string">
+  The ID of the signature request the event relates to.
+</ResponseField>
+
+### `document_viewed`
+
+The signer opened the document for the first time.
+
+```json
+{
+  "event": {
+    "event_id": "p-1phZC6_oU8qS191gsLT",
+    "event_category": "signing",
+    "event_type": "document_viewed",
+    "event_time": 1777039156023
+  },
+  "signing": {
+    "signature_request_id": "YfdkOH7dVtaGzl-egS6NI"
+  }
+}
+```
+
+### `document_signed`
+
+The signer completed and signed the document. Once signed, you can fetch the [signed envelope](/api-reference/endpoint/get-signed-envelope).
+
+```json
+{
+  "event": {
+    "event_id": "p-1phZC6_oU8qS191gsLT",
+    "event_category": "signing",
+    "event_type": "document_signed",
+    "event_time": 1777039156023
+  },
+  "signing": {
+    "signature_request_id": "YfdkOH7dVtaGzl-egS6NI"
+  }
+}
+```
+
+---
+
+## Redlining events
+
+Redlining events carry a `redlining` object and reference a [redline request](/guides/redlining). Every redlining payload includes these base fields, plus any event-specific fields listed below.
+
+<ResponseField name="redlining.redline_request_id" type="string">
+  The ID of the redline request the event relates to.
+</ResponseField>
+<ResponseField name="redlining.redline_member_role" type="string">
+  The role of the member who triggered the event. One of `disclosing_party`, `receiving_party`, `disclosing_counsel`, or `receiving_counsel`.
+</ResponseField>
+
+### `redline_edit_inserted`
+
+A member inserted new text into the document.
+
+<ResponseField name="redlining.redline_edit_insertion" type="string">
+  The inserted text.
+</ResponseField>
+
+```json
+{
+  "event": {
+    "event_id": "n9c8123umxrs082rum",
+    "event_category": "redlining",
+    "event_type": "redline_edit_inserted",
+    "event_time": 1777039156023
+  },
+  "redlining": {
+    "redline_request_id": "92cn47yxm92smsmdw",
+    "redline_member_role": "disclosing_party",
+    "redline_edit_insertion": "including any amendments hereto"
+  }
+}
+```
+
+### `redline_edit_deleted`
+
+A member deleted text from the document.
+
+<ResponseField name="redlining.redline_edit_deletion" type="string">
+  The deleted text.
+</ResponseField>
+
+```json
+{
+  "event": {
+    "event_id": "n9c8123umxrs082rum",
+    "event_category": "redlining",
+    "event_type": "redline_edit_deleted",
+    "event_time": 1777039156023
+  },
+  "redlining": {
+    "redline_request_id": "92cn47yxm92smsmdw",
+    "redline_member_role": "receiving_party",
+    "redline_edit_deletion": "within thirty (30) days"
+  }
+}
+```
+
+### `redline_edit_accepted`
+
+A member accepted a tracked change proposed by the other party.
+
+<ResponseField name="redlining.content" type="string">
+  The content of the change that was accepted.
+</ResponseField>
+<ResponseField name="redlining.change_type" type="string">
+  The kind of change. One of `inserted`, `deleted`, `replaced`, or `formatted`.
+</ResponseField>
+
+```json
+{
+  "event": {
+    "event_id": "n9c8123umxrs082rum",
+    "event_category": "redlining",
+    "event_type": "redline_edit_accepted",
+    "event_time": 1777039156023
+  },
+  "redlining": {
+    "redline_request_id": "92cn47yxm92smsmdw",
+    "redline_member_role": "disclosing_party",
+    "content": "net sixty (60) days",
+    "change_type": "replaced"
+  }
+}
+```
+
+### `redline_edit_rejected`
+
+A member rejected a tracked change proposed by the other party.
+
+<ResponseField name="redlining.content" type="string">
+  The content of the change that was rejected.
+</ResponseField>
+<ResponseField name="redlining.change_type" type="string">
+  The kind of change. One of `inserted`, `deleted`, `replaced`, or `formatted`.
+</ResponseField>
+
+```json
+{
+  "event": {
+    "event_id": "n9c8123umxrs082rum",
+    "event_category": "redlining",
+    "event_type": "redline_edit_rejected",
+    "event_time": 1777039156023
+  },
+  "redlining": {
+    "redline_request_id": "92cn47yxm92smsmdw",
+    "redline_member_role": "receiving_party",
+    "content": "exclusive jurisdiction of the courts of Delaware",
+    "change_type": "inserted"
+  }
+}
+```
+
+### `redline_comment_added`
+
+A member added a comment to the document.
+
+<ResponseField name="redlining.comment_added" type="string">
+  The comment text.
+</ResponseField>
+
+```json
+{
+  "event": {
+    "event_id": "n9c8123umxrs082rum",
+    "event_category": "redlining",
+    "event_type": "redline_comment_added",
+    "event_time": 1777039156023
+  },
+  "redlining": {
+    "redline_request_id": "92cn47yxm92smsmdw",
+    "redline_member_role": "receiving_party",
+    "comment_added": "Can we clarify the definition of Confidential Information here?"
+  }
+}
+```
+
+### `redline_message_added`
+
+A member posted a message in the negotiation thread.
+
+<ResponseField name="redlining.message" type="string">
+  The message text.
+</ResponseField>
+<ResponseField name="redlining.author_email" type="string">
+  The email address of the message author.
+</ResponseField>
+
+```json
+{
+  "event": {
+    "event_id": "n9c8123umxrs082rum",
+    "event_category": "redlining",
+    "event_type": "redline_message_added",
+    "event_time": 1777039156023
+  },
+  "redlining": {
+    "redline_request_id": "92cn47yxm92smsmdw",
+    "redline_member_role": "disclosing_party",
+    "message": "Please review the liability cap.",
+    "author_email": "counsel@example.com"
+  }
+}
+```
+
+### `redline_turn_ended`
+
+A member finished their turn and passed the document to the other party. Only the base `redlining` fields are included.
+
+```json
+{
+  "event": {
+    "event_id": "n9c8123umxrs082rum",
+    "event_category": "redlining",
+    "event_type": "redline_turn_ended",
+    "event_time": 1777039156023
+  },
+  "redlining": {
+    "redline_request_id": "92cn47yxm92smsmdw",
+    "redline_member_role": "receiving_party"
+  }
+}
+```
+
+### `document_ready_for_signing`
+
+All tracked changes have been resolved and the document is ready to be sent for signature. Only the base `redlining` fields are included.
+
+```json
+{
+  "event": {
+    "event_id": "n9c8123umxrs082rum",
+    "event_category": "redlining",
+    "event_type": "document_ready_for_signing",
+    "event_time": 1777039156023
+  },
+  "redlining": {
+    "redline_request_id": "92cn47yxm92smsmdw",
+    "redline_member_role": "disclosing_party"
+  }
+}
+```
+
+### `redline_shared`
+
+A redline request was shared with a member. Only the base `redlining` fields are included.
+
+```json
+{
+  "event": {
+    "event_id": "n9c8123umxrs082rum",
+    "event_category": "redlining",
+    "event_type": "redline_shared",
+    "event_time": 1777039156023
+  },
+  "redlining": {
+    "redline_request_id": "92cn47yxm92smsmdw",
+    "redline_member_role": "disclosing_party"
+  }
+}
+```
+
+---
+
+## Handling events
+
+Switch on `event.event_type` to route each event. Unknown types should be ignored gracefully so new event types don't break your handler.
+
+```javascript
+switch (payload.event.event_type) {
+  case "document_signed":
+    await onDocumentSigned(payload.signing.signature_request_id);
+    break;
+  case "document_ready_for_signing":
+    await onReadyForSigning(payload.redlining.redline_request_id);
+    break;
+  // ...handle other types you care about
+  default:
+    // Ignore unrecognized event types.
+    break;
+}
+```
