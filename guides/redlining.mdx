@@ -26,7 +26,7 @@ Provide the `templateId` and at least one member. Each member needs an `email`, 
 
 ```bash
 curl --request POST \
-  --url https://formable-production.up.railway.app/api/v0/redline-requests \
+  --url https://api.formabledocs.com/api/v0/redline-requests \
   --header "Authorization: Bearer $TOKEN" \
   --header 'Content-Type: application/json' \
   --data '{
@@ -58,7 +58,7 @@ Add or update members at any time — for example, to invite counsel — with [U
 
 ```bash
 curl --request PUT \
-  --url https://formable-production.up.railway.app/api/v0/redline-requests/rr_789ghi/members \
+  --url https://api.formabledocs.com/api/v0/redline-requests/rr_789ghi/members \
   --header "Authorization: Bearer $TOKEN" \
   --header 'Content-Type: application/json' \
   --data '{
@@ -76,7 +76,7 @@ Each member works on their turn through a member-specific redline URL. Pass the 
 
 ```bash
 curl --request POST \
-  --url https://formable-production.up.railway.app/api/v0/redline-requests/rr_789ghi/url \
+  --url https://api.formabledocs.com/api/v0/redline-requests/rr_789ghi/url \
   --header "Authorization: Bearer $TOKEN" \
   --header 'Content-Type: application/json' \
   --data '{ "memberEmail": "counsel@client.com" }'
@@ -105,7 +105,7 @@ The `currentRound` field indicates whose turn it is (`Disclosing` or `Receiving`
 
 ```bash
 curl --request GET \
-  --url https://formable-production.up.railway.app/api/v0/redline-requests/rr_789ghi \
+  --url https://api.formabledocs.com/api/v0/redline-requests/rr_789ghi \
   --header "Authorization: Bearer $TOKEN"
 ```
 

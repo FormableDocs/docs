@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "https://formable-production.up.railway.app/api",
+      "url": "https://api.formabledocs.com/api",
       "description": "Production"
     },
     {

@@ -22,7 +22,7 @@ curl --request POST \
   --data '{
     "client_id": "YOUR_CLIENT_ID",
     "client_secret": "YOUR_CLIENT_SECRET",
-    "audience": "https://formable-production.up.railway.app/api",
+    "audience": "https://api.formabledocs.com/api",
     "grant_type": "client_credentials"
   }'
 ```
@@ -34,7 +34,7 @@ const res = await fetch("https://YOUR_TENANT.auth0.com/oauth/token", {
   body: JSON.stringify({
     client_id: process.env.FORMABLE_CLIENT_ID,
     client_secret: process.env.FORMABLE_CLIENT_SECRET,
-    audience: "https://formable-production.up.railway.app/api",
+    audience: "https://api.formabledocs.com/api",
     grant_type: "client_credentials",
   }),
 });
@@ -51,7 +51,7 @@ res = requests.post(
     json={
         "client_id": os.environ["FORMABLE_CLIENT_ID"],
         "client_secret": os.environ["FORMABLE_CLIENT_SECRET"],
-        "audience": "https://formable-production.up.railway.app/api",
+        "audience": "https://api.formabledocs.com/api",
         "grant_type": "client_credentials",
     },
 )
@@ -77,7 +77,7 @@ Include the access token in the `Authorization` header of every API request.
 
 ```bash
 curl --request GET \
-  --url https://formable-production.up.railway.app/api/v0/signature-requests \
+  --url https://api.formabledocs.com/api/v0/signature-requests \
   --header 'Authorization: Bearer YOUR_ACCESS_TOKEN'
 ```
 
@@ -90,7 +90,7 @@ curl --request GET \
 <CodeGroup>
 
 ```text Production
-https://formable-production.up.railway.app/api
+https://api.formabledocs.com/api
 ```
 
 ```text Local
@@ -99,7 +99,7 @@ http://localhost:4000/api
 
 </CodeGroup>
 
-All endpoints are versioned under `/v0`, so a full URL looks like `https://formable-production.up.railway.app/api/v0/signature-requests`.
+All endpoints are versioned under `/v0`, so a full URL looks like `https://api.formabledocs.com/api/v0/signature-requests`.
 
 ## Authorization errors
 

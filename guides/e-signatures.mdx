@@ -35,7 +35,7 @@ A signature request needs:
 
 ```bash
 curl --request POST \
-  --url https://formable-production.up.railway.app/api/v0/signature-requests \
+  --url https://api.formabledocs.com/api/v0/signature-requests \
   --header "Authorization: Bearer $TOKEN" \
   --header 'Content-Type: application/json' \
   --data '{
@@ -90,7 +90,7 @@ A **signing URL** is a short-lived link that opens the signing experience for th
 
 ```bash
 curl --request POST \
-  --url https://formable-production.up.railway.app/api/v0/signature-requests/sr_456def/url \
+  --url https://api.formabledocs.com/api/v0/signature-requests/sr_456def/url \
   --header "Authorization: Bearer $TOKEN"
 ```
 
@@ -196,7 +196,7 @@ When the signer finishes, the signature request `status` becomes `Completed`. Yo
 
     ```bash
     curl --request GET \
-      --url https://formable-production.up.railway.app/api/v0/signature-requests/sr_456def \
+      --url https://api.formabledocs.com/api/v0/signature-requests/sr_456def \
       --header "Authorization: Bearer $TOKEN"
     ```
   </Accordion>
@@ -205,7 +205,7 @@ When the signer finishes, the signature request `status` becomes `Completed`. Yo
 
     ```bash
     curl --request GET \
-      --url https://formable-production.up.railway.app/api/v0/signature-requests/sr_456def/events \
+      --url https://api.formabledocs.com/api/v0/signature-requests/sr_456def/events \
       --header "Authorization: Bearer $TOKEN"
     ```
   </Accordion>
@@ -221,7 +221,7 @@ Once status is `Completed`, fetch a temporary download URL for the signed PDF. I
 
 ```bash
 curl --request GET \
-  --url https://formable-production.up.railway.app/api/v0/signature-requests/sr_456def/signed-envelope \
+  --url https://api.formabledocs.com/api/v0/signature-requests/sr_456def/signed-envelope \
   --header "Authorization: Bearer $TOKEN"
 ```
 

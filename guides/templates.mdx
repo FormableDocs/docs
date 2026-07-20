@@ -22,7 +22,7 @@ Send the file as `multipart/form-data` with a `file` part and a `filename` field
 
 ```bash
 curl --request POST \
-  --url https://formable-production.up.railway.app/api/v0/templates \
+  --url https://api.formabledocs.com/api/v0/templates \
   --header "Authorization: Bearer $TOKEN" \
   --form 'file=@./agreement.docx' \
   --form 'filename=agreement.docx'
@@ -64,7 +64,7 @@ If an editor URL has expired, mint a new one for the template.
 
 ```bash
 curl --request POST \
-  --url https://formable-production.up.railway.app/api/v0/templates/abc123xyz/edit-url \
+  --url https://api.formabledocs.com/api/v0/templates/abc123xyz/edit-url \
   --header "Authorization: Bearer $TOKEN"
 ```
 
