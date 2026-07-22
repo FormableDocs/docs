@@ -2,7 +2,7 @@
 
 Documentation for the Formable API, built on [Mintlify](https://mintlify.com).
 
-- **Guides** — introduction, authentication, quickstart, core concepts, walkthroughs, and migrations (`index.mdx`, `authentication.mdx`, `quickstart.mdx`, `concepts.mdx`, `walkthroughs/`, `migrations/`).
+- **Guides** — introduction, developer account setup, authentication, quickstart, core concepts, walkthroughs, and migrations (`index.mdx`, `developer-account.mdx`, `authentication.mdx`, `quickstart.mdx`, `concepts.mdx`, `walkthroughs/`, `migrations/`).
 - **API Reference** — auto-generated from `api-reference/openapi.json`, with one MDX page per endpoint under `api-reference/endpoint/`.
 - **Navigation & branding** — configured in `docs.json`.
 

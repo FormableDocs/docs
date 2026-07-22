@@ -1,0 +1,132 @@
+---
+title: "Set up a developer account"
+description: "Create a Formable account, organization, API keys, and webhooks so you can call the API."
+---
+
+To use the Formable API, create an account, add an organization, then generate an API key. Optionally register a webhook to receive signing and redlining events.
+
+## Create an account
+
+1. Go to [app.formabledocs.com/signup](https://app.formabledocs.com/signup) and create an account.
+2. Sign in at [app.formabledocs.com](https://app.formabledocs.com).
+3. Open [Settings](https://app.formabledocs.com/settings).
+
+Until you create an organization, API keys and webhooks stay locked.
+
+<Frame caption="Settings before you create an organization. Generate key and Register webhook are disabled.">
+  <img
+    src="/static/images/dev-settings/SettingsPreOrgCreation.png"
+    alt="Settings page showing an empty Organization section and disabled API keys and Webhooks actions"
+  />
+</Frame>
+
+## Create an organization
+
+API keys, webhooks, and API resources belong to an organization. Each account can have one organization.
+
+<Steps>
+  <Step title="Open Create organization">
+    In the **Organization** section, click **Create organization**.
+  </Step>
+  <Step title="Name your organization">
+    Enter a name and click **Create organization**.
+
+    <Frame caption="Name your organization in the Create organization dialog.">
+      <img
+        src="/static/images/dev-settings/SettingsMidOrgCreation.png"
+        alt="Create organization modal with Name set to Acme Inc"
+      />
+    </Frame>
+  </Step>
+  <Step title="Confirm it appears in Settings">
+    Your organization name and ID appear in Settings. **Generate key** and **Register webhook** become available.
+
+    <Frame caption="Settings after creating an organization. API keys and webhooks are unlocked.">
+      <img
+        src="/static/images/dev-settings/SettingsPostOrgCreation.png"
+        alt="Settings page showing Acme Inc organization with Generate key and Register webhook enabled"
+      />
+    </Frame>
+  </Step>
+</Steps>
+
+## Generate an API key
+
+Use an API key as a Bearer token on every request. See [Authentication](/authentication) for how to send it.
+
+<Steps>
+  <Step title="Generate a key">
+    In the **API keys** section, click **Generate key**, enter a name, and confirm.
+
+    <Frame caption="Give the key a name you'll recognize later, then click Generate key.">
+      <img
+        src="/static/images/dev-settings/SettingsMidApiKeyCreation.png"
+        alt="Generate API key modal with Name set to TestKeyName"
+      />
+    </Frame>
+  </Step>
+  <Step title="Copy the key immediately">
+    Formable shows the full key once. Copy it and store it as an environment secret before you click **Done**.
+
+    <Frame caption="Copy the key now. After you close this dialog, only a short prefix remains visible.">
+      <img
+        src="/static/images/dev-settings/SettingsApiKeyDisplayed.png"
+        alt="API key created modal showing a full fmbl_ key with a copy button"
+      />
+    </Frame>
+  </Step>
+</Steps>
+
+<Warning>
+  Never expose API keys in browser or mobile code. Call the API from your backend.
+</Warning>
+
+You can rename or delete keys from the same page. Deleting a key revokes it immediately. Each account can have up to 10 active keys.
+
+## Register a webhook
+
+Webhooks notify your app when documents are viewed, signed, or updated in a redline workflow. Each organization has one webhook URL. See [Webhooks overview](/webhooks/overview) for delivery details.
+
+<Steps>
+  <Step title="Register a callback URL">
+    In the **Webhooks** section, click **Register webhook**, enter an HTTPS callback URL, and confirm.
+
+    <Frame caption="Enter the HTTPS URL that should receive events.">
+      <img
+        src="/static/images/dev-settings/SettingsMidWebhookCreation.png"
+        alt="Register webhook modal with a Callback URL field"
+      />
+    </Frame>
+  </Step>
+  <Step title="Save the signing secret">
+    Copy the signing secret when it's shown and store it as an environment secret. You'll use it to [verify webhook signatures](/webhooks/verifying-signatures). Formable does not show the secret again.
+
+    <Frame caption="Copy the signing secret before you click Done.">
+      <img
+        src="/static/images/dev-settings/SettingsWebhookSecretDisplayed.png"
+        alt="Webhook registered modal showing a signing secret with a copy button"
+      />
+    </Frame>
+  </Step>
+</Steps>
+
+<Note>
+  Production callback URLs must use `https://`. After registration you can edit the URL, rotate the secret, or delete the endpoint from the actions menu next to your webhook.
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Send your API key on every request.
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Create a signature request and get a signing URL.
+  </Card>
+  <Card title="Webhooks" icon="bell" href="/webhooks/overview">
+    Handle delivery, retries, and event payloads.
+  </Card>
+  <Card title="Core concepts" icon="book" href="/concepts">
+    Learn how templates and signature requests fit together.
+  </Card>
+</CardGroup>
