@@ -1,0 +1,235 @@
+---
+title: "DocuSign → Embedded templates"
+description: "Migrate DocuSign embedded template editing to Formable's upload and editUrl flow."
+sidebarTitle: "Embedded templates"
+---
+
+This guide helps you move DocuSign template creation and embedded template editing to Formable. You still upload a document, open an editor for field placement, and reuse a `templateId` when sending. Formable collapses that into a multipart upload plus an `editUrl` iframe, without OAuth account paths or Anchor/AutoPlace tabs in the create payload.
+
+When templates are ready, continue with [DocuSign → Embedded signing](/migrations/docusign/embedded-signing) to send envelopes for signature.
+
+<Info>
+  New to Formable? Complete the [Embedded templates walkthrough](/walkthroughs/embedded-templates) first, then use this page as a translation layer from DocuSign templates and template edit views.
+</Info>
+
+<Tip>
+  Prefer a white-glove migration? Email [matt@formabledocs.com](mailto:matt@formabledocs.com) and we'll handle moving your DocuSign integration to the Formable API.
+</Tip>
+
+## What you're moving
+
+In DocuSign apps you typically:
+
+1. Create or update a template (API and/or web UI) under an account
+2. Define tabs with coordinates, anchors, or the sender / template UI
+3. Optionally open an embedded template edit view (`TemplateViews:createEdit` and similar) so users adjust fields in your product
+4. Send envelopes from that `templateId`, often with `templateRoles` and tab values
+
+In Formable you:
+
+1. `POST /v0/templates` with the file
+2. Embed `editUrl` so users place fields in your product
+3. Copy each field's `id` for later prefills
+4. Create signature requests with that `templateId` and a `signers` array
+
+You are migrating document preparation and in-product editing. Envelope send and recipient views live on the paired [signing guide](/migrations/docusign/embedded-signing).
+
+## Recommended order of work
+
+<Steps>
+  <Step title="Get a Formable API key">
+    Create an organization and key in [Settings](https://app.formabledocs.com/settings). See [Authentication](/authentication).
+  </Step>
+  <Step title="Re-upload each template document">
+    Call [`POST /v0/templates`](/api-reference/endpoint/create-template) with PDF or Word files (max 40MB).
+  </Step>
+  <Step title="Replace template edit views">
+    Embed `editUrl` from create, or [`POST .../edit-url`](/api-reference/endpoint/create-template-edit-url) when it expires.
+  </Step>
+  <Step title="Map tab labels to fieldIds">
+    Place fields in the Formable editor and update prefill code to use `fieldId` instead of DocuSign `tabLabel` / anchors.
+  </Step>
+  <Step title="Send with the new templateId">
+    Continue with [embedded signing migration](/migrations/docusign/embedded-signing).
+  </Step>
+</Steps>
+
+## What's similar
+
+The high-level template model still matches DocuSign:
+
+- Upload once, get a reusable template ID, send many times.
+- Users can edit field placement inside your product via a short-lived editor URL.
+- Prefills happen at send time against named field identifiers.
+- Template editing and signing use the same auth story on Formable (one Bearer key for both).
+
+If your DocuSign product already embeds a template editor and stores `templateId` for later envelope creates, keep that product flow. Rebuild how the file is uploaded and how the editor URL is minted.
+
+## What's different
+
+Plan for these DocuSign-specific patterns that do not map 1:1:
+
+| Area | DocuSign | Formable |
+| --- | --- | --- |
+| Auth | OAuth + account-scoped template APIs | Bearer `fmbl_…`; organization from the key |
+| Roles on create | Template roles defined up front | Fields in the editor; `signers` at send time |
+| Tab placement | Coordinates, Anchor / AutoPlace strings, or UI | Visual placement in Formable's editor |
+| Prefill keys | `tabLabel` / tab groups on roles | `fieldId` from the Formable editor |
+| Edit view | Template edit view API with account path | `editTemplateAccess.editUrl` or `POST .../edit-url` |
+| Editor TTL | Varies by view | Default about **1 day**; mint just in time |
+
+Anchor strings and absolute coordinates in create-envelope payloads do not carry over. Recreate positions in the Formable editor, then store the new `fieldId`s in your database or config.
+
+## Concept map
+
+| DocuSign | Formable | Notes |
+| --- | --- | --- |
+| Template | Template | Upload once, reuse `templateId`. |
+| Tabs (SignHere, Text, DateSigned, …) | Fields (Signature, Text, Date, …) | Placed in Formable's visual editor. |
+| Template edit view URL | `editUrl` | Embed in an iframe. Expires (default **1 day**). |
+| Anchor / AutoPlace tabs | Visual placement in the editor | Recreate positions in the UI; prefill by `fieldId`. |
+| Template roles | Signers at send time | Roles aren't declared on template create. |
+
+## Endpoint map
+
+| DocuSign | Formable |
+| --- | --- |
+| Create template / upload documents | [`POST /v0/templates`](/api-reference/endpoint/create-template) |
+| Template edit view (e.g. `TemplateViews:createEdit`) | [`POST /v0/templates/{templateId}/edit-url`](/api-reference/endpoint/create-template-edit-url) |
+| `editUrl` on create | `editTemplateAccess.editUrl` returned from create |
+
+## Auth
+
+DocuSign template APIs sit under `/v2.1/accounts/{accountId}/...` with an OAuth token. Formable uses the same Bearer key as signing:
+
+```bash
+curl https://api.formabledocs.com/api/v0/templates \
+  --header "Authorization: Bearer fmbl_YOUR_API_KEY" \
+  --form 'file=@./agreement.pdf' \
+  --form 'filename=agreement.pdf'
+```
+
+See [Authentication](/authentication). Call these endpoints from your backend only.
+
+## Migrate the flow
+
+### 1. Upload the template
+
+```bash
+curl --request POST \
+  --url https://api.formabledocs.com/api/v0/templates \
+  --header "Authorization: Bearer $TOKEN" \
+  --form 'file=@./agreement.pdf' \
+  --form 'filename=agreement.pdf'
+```
+
+```json Response
+{
+  "templateId": "abc123xyz",
+  "editTemplateAccess": {
+    "editUrl": "https://app.formabledocs.com/template-setup/abc123xyz",
+    "expiresAt": "2024-01-16T10:30:00.000Z"
+  }
+}
+```
+
+There is no separate OAuth account path. The organization comes from the API key. Supported uploads: PDF, DOCX, and DOC, up to **40MB**.
+
+### 2. Get a fresh editor URL
+
+When the create URL has expired, or whenever a user needs to edit again:
+
+```bash
+curl --request POST \
+  --url https://api.formabledocs.com/api/v0/templates/abc123xyz/edit-url \
+  --header "Authorization: Bearer $TOKEN"
+```
+
+```json Response
+{
+  "editUrl": "https://app.formabledocs.com/template-setup/abc123xyz",
+  "expiresAt": "2024-01-16T10:30:00.000Z"
+}
+```
+
+This replaces DocuSign's template edit view call. Generate just-in-time on your backend. Unknown IDs return `404`; templates outside your organization return `403`.
+
+### 3. Embed on the client
+
+```html
+<iframe
+  src="https://app.formabledocs.com/template-setup/abc123xyz"
+  width="100%"
+  height="800"
+  allow="fullscreen"
+  style="border: none;"
+></iframe>
+```
+
+Pass only the `editUrl` to the browser — never the API key. Template editing uses the same iframe pattern as [embedded signing](/migrations/docusign/embedded-signing).
+
+## Tab → field mapping
+
+| DocuSign tab | Formable field |
+| --- | --- |
+| SignHere / Signature | Signature |
+| Text / FullName / Company | Text |
+| DateSigned / Date | Date |
+| Checkbox | Checkbox |
+| Numerical / amount-style | Amount |
+
+If you previously set tab values on `templateRoles` when creating an envelope, use Formable `fields: [{ fieldId, value }]` at [signature request](/migrations/docusign/embedded-signing) time instead. Field IDs come from the editor after placement — see [prefills](/walkthroughs/embedded-signing#prefill-fields).
+
+## Differences to plan for
+
+<AccordionGroup>
+  <Accordion title="Visual editor instead of Anchor tabs">
+    Anchor strings and absolute coordinates in the create-envelope payload don't carry over. Place fields in Formable's editor and reference `fieldId`s for prefills.
+  </Accordion>
+  <Accordion title="No roles on template create">
+    DocuSign templates often define roles up front. Formable templates hold fields; you pass `signers` when creating the signature request.
+  </Accordion>
+  <Accordion title="API key instead of OAuth">
+    Template create and edit-url calls use the same Bearer API key as signing — no account-scoped OAuth token.
+  </Accordion>
+  <Accordion title="Rebuild prefill keys">
+    DocuSign `tabLabel` values won't match Formable `fieldId`s. After users place fields, store the new IDs and update your send payload.
+  </Accordion>
+</AccordionGroup>
+
+## Checklist
+
+<Steps>
+  <Step title="Create a Formable API key">
+    In [Settings](https://app.formabledocs.com/settings).
+  </Step>
+  <Step title="Re-upload each template document">
+    Call [`POST /v0/templates`](/api-reference/endpoint/create-template).
+  </Step>
+  <Step title="Replace template edit views">
+    Embed `editUrl` from create or [`POST .../edit-url`](/api-reference/endpoint/create-template-edit-url).
+  </Step>
+  <Step title="Map tab labels to fieldIds">
+    Place fields in the editor and update prefill code.
+  </Step>
+  <Step title="Send with the new templateId">
+    Continue with [embedded signing migration](/migrations/docusign/embedded-signing).
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Embedded signing migration" icon="signature" href="/migrations/docusign/embedded-signing">
+    Map envelopes and recipient views to Formable.
+  </Card>
+  <Card title="Embedded templates walkthrough" icon="file-lines" href="/walkthroughs/embedded-templates">
+    Full Formable template editor walkthrough.
+  </Card>
+  <Card title="Core concepts" icon="book" href="/concepts">
+    How templates and signature requests fit together.
+  </Card>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Bearer `fmbl_` API keys.
+  </Card>
+</CardGroup>

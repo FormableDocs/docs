@@ -36,7 +36,7 @@ Every payload shares the same top-level shape — an `event` metadata object plu
 
 ## Signing events
 
-Signing events carry a `signing` object and reference a [signature request](/guides/e-signatures).
+Signing events carry a `signing` object and reference a [signature request](/walkthroughs/embedded-signing).
 
 <ResponseField name="signing.signature_request_id" type="string">
   The ID of the signature request the event relates to.
@@ -82,7 +82,7 @@ The signer completed and signed the document. Once signed, you can fetch the [si
 
 ## Redlining events
 
-Redlining events carry a `redlining` object and reference a [redline request](/guides/redlining). Every redlining payload includes these base fields, plus any event-specific fields listed below.
+Redlining events carry a `redlining` object and reference a [redline request](/walkthroughs/redlining). Every redlining payload includes these base fields, plus any event-specific fields listed below.
 
 <ResponseField name="redlining.redline_request_id" type="string">
   The ID of the redline request the event relates to.

@@ -1,0 +1,175 @@
+---
+title: "Embedded templates"
+description: "Let users create and edit templates inside your product with an embeddable editor URL."
+---
+
+Give your users the ability to upload documents and place signature fields directly in your product. Formable returns a short-lived `editUrl` that you load in an iframe — the same embedding pattern as [embedded signing](/walkthroughs/embedded-signing).
+
+This walkthrough covers uploading a file, embedding the template editor, placing fields, and regenerating an editor URL when it expires.
+
+## Prerequisites
+
+- An [API key](/authentication) from [Settings](https://app.formabledocs.com/settings)
+- A PDF or Word document under 40MB
+- Call the Formable API from your **backend** only
+
+## Supported files
+
+| Format | MIME type |
+| --- | --- |
+| PDF | `application/pdf` |
+| DOCX | `application/vnd.openxmlformats-officedocument.wordprocessingml.document` |
+| DOC | `application/msword` |
+
+Maximum size: **40MB**.
+
+<Info>
+  If you later use [redlining](/walkthroughs/redlining), the template needs a **DOCX** source file because redlining edits the underlying document.
+</Info>
+
+## Overview
+
+<Steps>
+  <Step title="Upload a template">
+    Send the file to Formable and receive a `templateId` plus an `editUrl`.
+  </Step>
+  <Step title="Embed the editor">
+    Load the `editUrl` in an iframe so users place fields in your product.
+  </Step>
+  <Step title="Reuse the templateId">
+    Create signature requests (or redline requests) from the prepared template.
+  </Step>
+</Steps>
+
+## Server side
+
+### 1. Upload a template
+
+Send the file as `multipart/form-data` with a `file` part and a `filename` field. Formable returns the `templateId` plus a ready-to-use editor URL.
+
+```bash
+curl --request POST \
+  --url https://api.formabledocs.com/api/v0/templates \
+  --header "Authorization: Bearer $TOKEN" \
+  --form 'file=@./agreement.docx' \
+  --form 'filename=agreement.docx'
+```
+
+```json Response
+{
+  "templateId": "abc123xyz",
+  "editTemplateAccess": {
+    "editUrl": "https://app.formabledocs.com/template-setup/abc123xyz",
+    "expiresAt": "2024-01-16T10:30:00.000Z"
+  }
+}
+```
+
+Save the `templateId` — you'll pass it when creating [signature requests](/walkthroughs/embedded-signing) (and redline requests).
+
+<Warning>
+  Files over 40MB return `413`. Unsupported file types return `400` with `"Unsupported file type, only pdf, docx, and doc are supported"`.
+</Warning>
+
+### 2. Regenerate an editor URL
+
+Editor URLs expire (by default one day after creation). Mint a fresh one when a user needs to edit the template again.
+
+```bash
+curl --request POST \
+  --url https://api.formabledocs.com/api/v0/templates/abc123xyz/edit-url \
+  --header "Authorization: Bearer $TOKEN"
+```
+
+```json Response
+{
+  "editUrl": "https://app.formabledocs.com/template-setup/abc123xyz",
+  "expiresAt": "2024-01-16T10:30:00.000Z"
+}
+```
+
+Generate the URL just before you show the editor. Pass only the URL to the client — never your API key.
+
+<Warning>
+  You can only create an edit URL for templates owned by your organization. Other templates return `403`, and unknown IDs return `404`.
+</Warning>
+
+## Client side
+
+Embed the `editUrl` in an iframe so users place fields without leaving your product.
+
+```html
+<iframe
+  src="https://app.formabledocs.com/template-setup/abc123xyz"
+  width="100%"
+  height="800"
+  allow="fullscreen"
+  style="border: none;"
+></iframe>
+```
+
+Request the URL from your backend and pass it to the page just before rendering:
+
+<CodeGroup>
+
+```javascript React
+function TemplateEditorFrame({ templateId }) {
+  const [editUrl, setEditUrl] = useState(null);
+
+  useEffect(() => {
+    fetch(`/api/formable/edit-url?templateId=${templateId}`)
+      .then((res) => res.json())
+      .then((data) => setEditUrl(data.editUrl));
+  }, [templateId]);
+
+  if (!editUrl) return <p>Loading…</p>;
+
+  return (
+    <iframe
+      src={editUrl}
+      width="100%"
+      height="800"
+      allow="fullscreen"
+      style={{ border: "none" }}
+      title="Edit template"
+    />
+  );
+}
+```
+
+```html Plain HTML
+<iframe
+  src="{{ editUrl }}"
+  width="100%"
+  height="800"
+  allow="fullscreen"
+  style="border: none;"
+></iframe>
+```
+
+</CodeGroup>
+
+## Place fields in the editor
+
+In the embedded editor, place and configure fields on the document:
+
+| Field | Use |
+| --- | --- |
+| **Signature** | Where the signer signs |
+| **Text** | Free-form text input |
+| **Date** | A date value |
+| **Checkbox** | A boolean toggle |
+| **Amount** | A monetary value |
+
+Each field has an `id`. You reference these IDs when you [prefill fields](/walkthroughs/embedded-signing#prefill-fields) on a signature request.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Embedded signing" icon="window-maximize" href="/walkthroughs/embedded-signing">
+    Send the template for signature and embed the signing experience.
+  </Card>
+  <Card title="Redlining" icon="pen-line" href="/walkthroughs/redlining">
+    Negotiate revisions on a DOCX template before signing.
+  </Card>
+</CardGroup>

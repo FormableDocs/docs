@@ -23,16 +23,30 @@
             ]
           },
           {
-            "group": "E-signatures",
+            "group": "Walkthroughs",
             "pages": [
-              "guides/e-signatures",
-              "guides/templates"
+              "walkthroughs/embedded-signing",
+              "walkthroughs/embedded-templates",
+              "walkthroughs/redlining"
             ]
           },
           {
-            "group": "Redlining",
+            "group": "Migrations",
             "pages": [
-              "guides/redlining"
+              {
+                "group": "Dropbox Sign",
+                "pages": [
+                  "migrations/dropbox-sign/embedded-signing",
+                  "migrations/dropbox-sign/embedded-templates"
+                ]
+              },
+              {
+                "group": "DocuSign",
+                "pages": [
+                  "migrations/docusign/embedded-signing",
+                  "migrations/docusign/embedded-templates"
+                ]
+              }
             ]
           },
           {
@@ -100,6 +114,36 @@
       }
     ]
   },
+  "redirects": [
+    {
+      "source": "/guides/e-signatures",
+      "destination": "/walkthroughs/embedded-signing"
+    },
+    {
+      "source": "/guides/embedded-signing",
+      "destination": "/walkthroughs/embedded-signing"
+    },
+    {
+      "source": "/guides/templates",
+      "destination": "/walkthroughs/embedded-templates"
+    },
+    {
+      "source": "/walkthroughs/templates",
+      "destination": "/walkthroughs/embedded-templates"
+    },
+    {
+      "source": "/guides/redlining",
+      "destination": "/walkthroughs/redlining"
+    },
+    {
+      "source": "/migrations/dropbox-sign",
+      "destination": "/migrations/dropbox-sign/embedded-signing"
+    },
+    {
+      "source": "/migrations/docusign",
+      "destination": "/migrations/docusign/embedded-signing"
+    }
+  ],
   "logo": {
     "light": "/logo/light.svg",
     "dark": "/logo/dark.svg"
@@ -108,7 +152,7 @@
     "links": [
       {
         "label": "Support",
-        "href": "mailto:support@formabledocs.com"
+        "href": "mailto:matt@formabledocs.com"
       }
     ],
     "primary": {

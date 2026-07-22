@@ -46,20 +46,37 @@ The request body **is** the event object — it is not wrapped in an envelope. E
 
 ## Register an endpoint
 
-Webhook endpoints are configured per organization by the Formable team.
+Register your webhook URL in [Settings](https://app.formabledocs.com/settings) after creating an organization. Each organization has one webhook URL.
 
 <Steps>
-  <Step title="Send us your URL">
-    Contact [support@formabledocs.com](mailto:support@formabledocs.com) with the HTTPS URL that should receive events.
+  <Step title="Create an organization">
+    Go to [Settings](https://app.formabledocs.com/settings) and create an organization if you don't have one yet.
   </Step>
-  <Step title="Receive your signing secret">
-    We provision a signing secret for your endpoint and share it securely. Store it as a secret in your environment — you'll use it to [verify signatures](/webhooks/verifying-signatures).
+  <Step title="Register your callback URL">
+    In the **Webhooks** section, click **Register webhook**, enter the HTTPS URL that should receive events, and confirm. Production URLs must use `https://`.
+  </Step>
+  <Step title="Save your signing secret">
+    Copy the signing secret shown once after registration and store it as an environment secret. You'll use it to [verify signatures](/webhooks/verifying-signatures). Formable does not show the secret again.
   </Step>
 </Steps>
 
 <Note>
   Each organization has **one** webhook URL. For e-signing, handle `document_viewed` and `document_signed`. The same endpoint also receives redlining events if you use that workflow — inspect `event.event_type` to decide what to act on.
 </Note>
+
+## Manage your endpoint
+
+After registration, use the actions menu next to your webhook URL in Settings:
+
+| Action | What it does |
+| --- | --- |
+| **Edit URL** | Changes the callback URL. Does **not** rotate the signing secret. |
+| **Rotate secret** | Issues a new signing secret and invalidates the old one immediately. Copy the new secret when it's shown. |
+| **Delete** | Removes the endpoint so you can register a new one. |
+
+<Warning>
+  After you rotate the secret, update your environment before Formable delivers the next event, or signature verification will fail.
+</Warning>
 
 ## Respond quickly
 

@@ -1,5 +1,5 @@
 ---
-title: "Quickstart"
+title: "Embedded Signing Quickstart"
 description: "Create your first signature request and get an embeddable signing URL."
 ---
 
@@ -9,12 +9,11 @@ This guide takes you from zero to a live, embeddable signing session. You'll upl
 
 Before you begin, you need:
 
-- **API credentials** (client ID and secret) from [support@formabledocs.com](mailto:support@formabledocs.com)
-- An **access token** — see [Authentication](/authentication)
+- An **API key** from [Settings](https://app.formabledocs.com/settings) — see [Authentication](/authentication)
 - A **PDF or DOCX file** under 40MB to send for signature
 
 <Info>
-  The examples below use the production base URL `https://api.formabledocs.com/api`. Replace `$TOKEN` with your access token.
+  The examples below use the production base URL `https://api.formabledocs.com/api`. Replace `$TOKEN` with your API key (it starts with `fmbl_`).
 </Info>
 
 ## Steps
@@ -42,7 +41,7 @@ Before you begin, you need:
     ```
 
     <Tip>
-      Open the `editUrl` in a browser to place signature, text, and date fields on the document. See [Manage templates](/guides/templates).
+      Open the `editUrl` in a browser to place signature, text, and date fields on the document. See [Embedded templates](/walkthroughs/embedded-templates).
     </Tip>
   </Step>
 
@@ -115,10 +114,10 @@ Before you begin, you need:
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="E-signature workflow" icon="signature" href="/guides/e-signatures">
+  <Card title="Embedded signing" icon="window-maximize" href="/walkthroughs/embedded-signing">
     Prefill fields, embed signing, detect completion, and download the signed PDF.
   </Card>
-  <Card title="Manage templates" icon="file-lines" href="/guides/templates">
+  <Card title="Embedded templates" icon="file-lines" href="/walkthroughs/embedded-templates">
     Place fields and reuse documents across signature requests.
   </Card>
   <Card title="Webhooks" icon="bell" href="/webhooks/overview">
@@ -129,4 +128,4 @@ Before you begin, you need:
   </Card>
 </CardGroup>
 
-Need contract negotiation before signing? See the optional [redlining workflow](/guides/redlining).
+Need contract negotiation before signing? See the optional [redlining walkthrough](/walkthroughs/redlining).

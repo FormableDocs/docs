@@ -1,33 +1,48 @@
 ---
-title: "E-signature workflow"
-description: "Send a document for signature, prefill fields, and retrieve the signed result."
+title: "Embedded signing"
+description: "Let users sign documents inside your app with an embeddable signing URL."
 ---
 
-This guide walks through sending a document for someone to sign inside your product, then downloading the signed PDF when they're done.
+Give your users the ability to sign documents directly in your product. Formable returns a short-lived signing URL that you load in an iframe — no email round-trip required.
 
-In Formable terms:
+This walkthrough covers the full embedded signing flow: create a signature request on your server, embed the signing experience on the client, detect completion, and download the signed PDF.
 
-- A **template** is the reusable document (for example an NDA or agreement) with signature and form fields placed on it.
-- A **signature request** is one send of that template to one signer — like mailing a filled-out copy for signature.
-- The **signed envelope** is the finished signed document you download after they complete signing.
+<Info>
+  Need a shorter path first? Complete the [quickstart](/quickstart), then return here for the full integration pattern.
+</Info>
 
-For a fuller glossary, see [Core concepts](/concepts).
+## Prerequisites
+
+Before you begin:
+
+1. Create an organization and [API key](/authentication) in [Settings](https://app.formabledocs.com/settings).
+2. Upload a template and place at least one signature field — see the [Embedded templates walkthrough](/walkthroughs/embedded-templates).
+3. Call the Formable API from your **backend** only. Never expose your API key in the browser.
 
 ## Overview
 
 <Steps>
-  <Step title="Create a signature request from a template" />
-  <Step title="Generate a signing URL" />
-  <Step title="Embed the signing URL in an iframe" />
-  <Step title="Detect when the signer finishes" />
-  <Step title="Download the signed PDF" />
+  <Step title="Create a signature request">
+    Start a request from a template with a signer and sender.
+  </Step>
+  <Step title="Generate a signing URL">
+    Mint a short-lived URL for that request just before the signer is ready.
+  </Step>
+  <Step title="Embed the URL in an iframe">
+    Load the signing experience inside your product.
+  </Step>
+  <Step title="Detect completion and download">
+    Listen for webhooks or poll status, then fetch the signed PDF.
+  </Step>
 </Steps>
 
-## 1. Create a signature request
+## Server side
 
-Start from a template you've already uploaded and prepared. If you don't have one yet, see [Manage templates](/guides/templates).
+Create the signature request and signing URL on your backend, then pass only the URL to the client.
 
-A signature request needs:
+### 1. Create a signature request
+
+Start from a template you've already prepared. A signature request needs:
 
 - `templateId` — which document to send
 - `signer` — who will sign (`email` + `name`)
@@ -41,7 +56,8 @@ curl --request POST \
   --data '{
     "templateId": "abc123xyz",
     "signer": { "email": "signer@example.com", "name": "Jane Doe" },
-    "sender": { "email": "you@yourcompany.com", "name": "Your Company" }
+    "sender": { "email": "you@yourcompany.com", "name": "Your Company" },
+    "testMode": true
   }'
 ```
 
@@ -51,9 +67,9 @@ curl --request POST \
 
 Save the `signatureRequestId`. You'll use it to generate a signing URL, track progress, and download the signed PDF.
 
-### Prefill fields
+#### Prefill fields
 
-Templates can include fields beyond the signature itself — company name, dates, checkboxes, and so on. To fill those in before the signer opens the document, pass a `fields` array. Each entry sets a `value` on a `fieldId` from the template.
+Templates can include fields beyond the signature — company name, dates, checkboxes, and so on. Pass a `fields` array to set values before the signer opens the document. Each entry sets a `value` on a `fieldId` from the template.
 
 ```json
 {
@@ -63,30 +79,22 @@ Templates can include fields beyond the signature itself — company name, dates
   "fields": [
     { "fieldId": "field_company_name", "value": "Acme Corporation" },
     { "fieldId": "field_effective_date", "value": "2024-02-01" }
-  ]
-}
-```
-
-<Info>
-  Field IDs come from the template. Open the template's [editor URL](/guides/templates) to place fields and copy their IDs. A `fieldId` that doesn't exist on the template returns a `400`.
-</Info>
-
-### Test mode
-
-While integrating, set `testMode: true` so the request doesn't count toward billing.
-
-```json
-{
-  "templateId": "abc123xyz",
-  "signer": { "email": "signer@example.com", "name": "Jane Doe" },
-  "sender": { "email": "you@yourcompany.com", "name": "Your Company" },
+  ],
   "testMode": true
 }
 ```
 
-## 2. Generate a signing URL
+<Info>
+  Field IDs come from the template. Open the template's [editor URL](/walkthroughs/embedded-templates) to place fields and copy their IDs. A `fieldId` that doesn't exist on the template returns a `400`.
+</Info>
 
-A **signing URL** is a short-lived link that opens the signing experience for this signature request. It expires **one hour** after creation, so generate it right before you show it to the signer.
+#### Test mode
+
+Set `testMode: true` while integrating so the request doesn't count toward billing.
+
+### 2. Generate a signing URL
+
+A **signing URL** opens the signing experience for this request. It expires **one hour** after creation, so generate it right before you show it to the signer.
 
 ```bash
 curl --request POST \
@@ -102,12 +110,12 @@ curl --request POST \
 ```
 
 <Warning>
-  A signing URL can't be created once the document is already completed — that request returns `409`.
+  Creating a signing URL for an already completed request returns `409`.
 </Warning>
 
-## 3. Embed the signing URL
+## Client side
 
-Embed the `signingUrl` in an `iframe` so the signer can complete the document without leaving your product.
+Embed the `signingUrl` in an iframe so the signer can complete the document without leaving your product.
 
 ```html
 <iframe
@@ -119,7 +127,7 @@ Embed the `signingUrl` in an `iframe` so the signer can complete the document wi
 ></iframe>
 ```
 
-Because the signing URL is short-lived and unique per signature request, request it from your **backend** and pass it to the page just before rendering the iframe:
+Request the URL from your backend and pass it to the page just before rendering:
 
 <CodeGroup>
 
@@ -128,8 +136,6 @@ function SigningFrame({ signatureRequestId }) {
   const [signingUrl, setSigningUrl] = useState(null);
 
   useEffect(() => {
-    // Call your own backend, which requests the signing URL from Formable
-    // using your API token, then returns it to the client.
     fetch(`/api/formable/signing-url?signatureRequestId=${signatureRequestId}`)
       .then((res) => res.json())
       .then((data) => setSigningUrl(data.signingUrl));
@@ -151,7 +157,6 @@ function SigningFrame({ signatureRequestId }) {
 ```
 
 ```html Plain HTML
-<!-- Server-side, inject the freshly generated signingUrl into the src -->
 <iframe
   src="{{ signingUrl }}"
   width="100%"
@@ -171,7 +176,7 @@ function SigningFrame({ signatureRequestId }) {
   Give the iframe enough height (around `800px`) so signers don't have to scroll within a small frame. Regenerate the URL if the signer returns after it has expired.
 </Tip>
 
-## 4. Detect completion
+## Detect completion
 
 When the signer finishes, the signature request `status` becomes `Completed`. You have three ways to learn that:
 
@@ -201,7 +206,7 @@ When the signer finishes, the signature request `status` becomes `Completed`. Yo
     ```
   </Accordion>
   <Accordion title="Read the event stream" icon="list">
-    Fetch [signature request events](/api-reference/endpoint/get-signature-request-events) for a chronological history of what happened, including sending and completion.
+    Fetch [signature request events](/api-reference/endpoint/get-signature-request-events) for a chronological history of what happened.
 
     ```bash
     curl --request GET \
@@ -215,9 +220,9 @@ When the signer finishes, the signature request `status` becomes `Completed`. Yo
   Prefer the webhook for near real-time handling. Use [List signature requests](/api-reference/endpoint/list-signature-requests) with `updatedSince`, or the event stream, to reconcile anything you missed.
 </Tip>
 
-## 5. Download the signed PDF
+## Download the signed PDF
 
-Once status is `Completed`, fetch a temporary download URL for the signed PDF. In the API this is called the **signed envelope** — the completed document with the signature applied.
+Once status is `Completed`, fetch a temporary download URL for the signed PDF (the **signed envelope**).
 
 ```bash
 curl --request GET \
@@ -231,8 +236,25 @@ curl --request GET \
 }
 ```
 
-Open or download that URL promptly; it is a short-lived presigned link to the PDF.
+Open or download that URL promptly — it is a short-lived presigned link.
 
 <Note>
   Requesting the signed envelope before signing is complete returns `409` with `"Envelope has not been signed yet"`.
 </Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Embedded templates" icon="file-lines" href="/walkthroughs/embedded-templates">
+    Upload documents and place signature and form fields.
+  </Card>
+  <Card title="Webhooks" icon="bell" href="/webhooks/overview">
+    Get notified when a document is viewed or signed.
+  </Card>
+  <Card title="Redlining" icon="pen-line" href="/walkthroughs/redlining">
+    Negotiate a DOCX contract before signing.
+  </Card>
+  <Card title="API reference" icon="code" href="/api-reference/introduction">
+    Full endpoint docs for signature requests.
+  </Card>
+</CardGroup>

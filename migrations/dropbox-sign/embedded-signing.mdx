@@ -1,0 +1,296 @@
+---
+title: "Dropbox Sign → Embedded signing"
+description: "Migrate Dropbox Sign embedded signing (create_embedded, sign_url) to the Formable API."
+sidebarTitle: "Embedded signing"
+---
+
+This guide helps you move a [Dropbox Sign embedded signing](https://developers.hellosign.com/docs/walkthroughs/embedded-signing) integration to Formable. You keep the same product shape (create a request, mint a URL, embed it) while swapping endpoints, auth, and how you open the signing UI.
+
+If you also embed template setup in your product, migrate that first with [Dropbox Sign → Embedded templates](/migrations/dropbox-sign/embedded-templates). Signing always starts from a prepared Formable template.
+
+<Info>
+  New to Formable? Complete the [Embedded signing walkthrough](/walkthroughs/embedded-signing) first, then use this page as a translation layer from Dropbox Sign terms and calls.
+</Info>
+
+<Tip>
+  Prefer a white-glove migration? Email [matt@formabledocs.com](mailto:matt@formabledocs.com) and we'll handle moving your Dropbox Sign integration to the Formable API.
+</Tip>
+
+## What you're moving
+
+In Dropbox Sign you typically:
+
+1. Create an embedded signature request (`create_embedded` or `create_embedded_with_template`)
+2. Fetch a per-signer `sign_url` with each `signature_id`
+3. Open it with `hellosign-embedded`
+4. React to callbacks such as `signature_request_all_signed`, then download files
+
+In Formable you:
+
+1. Upload and prepare a **template** (once, then reuse)
+2. Create a **signature request** from that `templateId`
+3. Mint a `signingUrl` and load it in a plain iframe
+4. Handle `document_signed` (webhook or poll), then download the signed PDF
+
+The journey is familiar: backend creates the send, backend mints a short-lived URL, frontend embeds it. The main mental shifts are template-first sending, Bearer API keys, and no Dropbox Sign client library.
+
+## Recommended order of work
+
+<Steps>
+  <Step title="Get a Formable API key">
+    Create an organization and key in [Settings](https://app.formabledocs.com/settings). See [Authentication](/authentication).
+  </Step>
+  <Step title="Migrate templates">
+    Recreate documents and fields in Formable. If you use embedded templates today, follow [Embedded templates migration](/migrations/dropbox-sign/embedded-templates).
+  </Step>
+  <Step title="Swap create + signing URL calls">
+    Replace `create_embedded*` and `/embedded/sign_url/{signature_id}` with Formable signature-request endpoints.
+  </Step>
+  <Step title="Replace hellosign-embedded with an iframe">
+    Pass only the `signingUrl` from your backend to the browser.
+  </Step>
+  <Step title="Point webhooks at Formable">
+    Register a URL in Settings. See [Webhooks](/webhooks/overview).
+  </Step>
+</Steps>
+
+## What's similar
+
+Much of the Dropbox Sign model still maps cleanly:
+
+- You still create a **signature request** on the server, then open a short-lived URL in the browser.
+- Templates remain the reusable document definition. One template powers many sends.
+- `test_mode` / `testMode` keeps integration traffic out of billing.
+- You still download a completed PDF after everyone has signed.
+- Signing URLs are meant to be generated **just in time**, not stored long-term. Dropbox Sign `sign_url` values last about 60 minutes and same with Formable `signingUrl`.
+
+Migrating from Dropbox Sign to Formable is almost a 1 to 1 mapping. 
+
+## What's different
+
+Plan for these shifts early so you don't recreate Dropbox Sign patterns that Formable doesn't use:
+
+| Area | Dropbox Sign | Formable |
+| --- | --- | --- |
+| Auth | API key | API key |
+| App / client | API App + `client_id` on requests and in the JS client | Organization implied by the API key; omit `client_id` |
+| Files on send | `create_embedded` can attach files inline | Upload a [template](/walkthroughs/embedded-templates) first, then create the signature request |
+| Signing URL scope | One `sign_url` per `signature_id` | One `sign_url` per `signature_id` |
+| Client embed | `hellosign-embedded` + `client.open(...)` | Plain `<iframe src={signingUrl}>` |
+| Completion signal | Client events + callbacks (`signature_request_all_signed`, etc.) | Prefer [`document_signed`](/webhooks/events#document_signed); no Formable JS client events |
+| Webhook verification | `event_hash` | `Content-Sha256` HMAC — see [Verifying signatures](/webhooks/verifying-signatures) |
+
+Formable is intentionally template-first. If your Dropbox Sign code uploads PDFs on every `create_embedded`, move that upload into a one-time (or occasional) template create/edit step, then send with `templateId`.
+
+## Concept map
+
+| Dropbox Sign | Formable | Notes |
+| --- | --- | --- |
+| API key (HTTP Basic) | API key (`Authorization: Bearer fmbl_…`) | See [Authentication](/authentication). |
+| API App + `client_id` | Organization | Implied by the API key — not sent on requests. |
+| Signature request | Signature request | One send of a template to one or more signers. |
+| `signature_id` (per signer) | Not required for the URL | Formable mints a URL from the `signatureRequestId`. |
+| `sign_url` | `signingUrl` | Embed in an iframe. Expires after **1 hour**. |
+| `hellosign-embedded` | Plain `<iframe>` | No Formable JS SDK. |
+| `test_mode: true` | `testMode: true` | Excluded from billing. |
+| `signature_request_all_signed` / `downloadable` | `document_signed` | Then fetch the signed PDF. |
+
+## Endpoint map
+
+| Dropbox Sign | Formable |
+| --- | --- |
+| `POST /v3/signature_request/create_embedded_with_template` | [`POST /v0/signature-requests`](/api-reference/endpoint/create-signature-request) |
+| `POST /v3/signature_request/create_embedded` (files inline) | Upload a [template](/walkthroughs/embedded-templates) first, then create the signature request |
+| `GET /v3/embedded/sign_url/{signature_id}` | [`POST /v0/signature-requests/{id}/url`](/api-reference/endpoint/create-signing-url) |
+| `GET /v3/signature_request/files/{signature_request_id}` | [`GET /v0/signature-requests/{id}/signed-envelope`](/api-reference/endpoint/get-signed-envelope) |
+
+## Auth
+
+Dropbox Sign typically uses HTTP Basic:
+
+```bash
+curl https://api.hellosign.com/v3/account -u 'YOUR_API_KEY:'
+```
+
+Formable uses Bearer tokens that start with `fmbl_`:
+
+```bash
+curl https://api.formabledocs.com/api/v0/signature-requests \
+  --header "Authorization: Bearer fmbl_YOUR_API_KEY"
+```
+
+Create the key in [Settings](https://app.formabledocs.com/settings) and call the API only from your backend. Full details: [Authentication](/authentication).
+
+## Migrate the flow
+
+### 1. Create the signature request
+
+**Dropbox Sign** (`create_embedded_with_template`):
+
+```bash
+curl https://api.hellosign.com/v3/signature_request/create_embedded_with_template \
+  -u 'YOUR_API_KEY:' \
+  -F 'client_id=YOUR_CLIENT_ID' \
+  -F 'template_ids[]=TEMPLATE_ID' \
+  -F 'signers[0][role]=Client' \
+  -F 'signers[0][email_address]=jane@example.com' \
+  -F 'signers[0][name]=Jane Doe' \
+  -F 'test_mode=1'
+```
+
+**Formable:**
+
+```bash
+curl --request POST \
+  --url https://api.formabledocs.com/api/v0/signature-requests \
+  --header "Authorization: Bearer $TOKEN" \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "templateId": "abc123xyz",
+    "signers": [
+      { "email": "jane@example.com", "name": "Jane Doe" }
+    ],
+    "sender": { "email": "you@yourcompany.com", "name": "Your Company" },
+    "testMode": true
+  }'
+```
+
+```json Response
+{ "signatureRequestId": "sr_456def" }
+```
+
+Prefer the `signers` array when creating requests. Pass a `sender` on every create. Use `fields: [{ fieldId, value }]` for prefills (field IDs come from the template editor).
+
+| Dropbox Sign field | Formable field |
+| --- | --- |
+| `template_ids[]` | `templateId` (one template per request) |
+| `signers[].email_address` / `name` | `signers[].email` / `name` |
+| `signers[].role` | Not used — signer order is the array order |
+| `client_id` | Omit |
+| `test_mode` | `testMode` |
+| Custom / merge fields | `fields: [{ fieldId, value }]` |
+
+### 2. Generate the signing URL
+
+**Dropbox Sign** — per-signer `signature_id`:
+
+```bash
+curl https://api.hellosign.com/v3/embedded/sign_url/SIGNATURE_ID \
+  -u 'YOUR_API_KEY:'
+```
+
+**Formable** — from the signature request:
+
+```bash
+curl --request POST \
+  --url https://api.formabledocs.com/api/v0/signature-requests/sr_456def/url \
+  --header "Authorization: Bearer $TOKEN"
+```
+
+```json Response
+{
+  "signingUrl": "https://app.formabledocs.com/sign/embedded/xyz789abc",
+  "expiresAt": "2024-01-16T10:30:00.000Z"
+}
+```
+
+Generate the URL just before the signer is ready. Formable URLs expire after **one hour**. Creating a URL for an already completed request returns `409`.
+
+### 3. Embed on the client
+
+**Dropbox Sign:**
+
+```javascript
+import HelloSign from "hellosign-embedded";
+
+const client = new HelloSign({ clientId: "YOUR_CLIENT_ID" });
+client.open(signUrl, { skipDomainVerification: true });
+```
+
+**Formable** — plain iframe (no SDK, no `client_id`, no `skipDomainVerification`):
+
+```html
+<iframe
+  src="https://app.formabledocs.com/sign/embedded/xyz789abc"
+  width="100%"
+  height="800"
+  allow="fullscreen"
+  style="border: none;"
+></iframe>
+```
+
+Mint the URL on your backend and pass only the URL to the browser. Never call Formable with your API key from client-side code.
+
+### 4. Detect completion and download the PDF
+
+Prefer the [`document_signed`](/webhooks/events#document_signed) webhook over polling. You can also poll signature request `status` until it is `Completed`, or read the [event stream](/api-reference/endpoint/get-signature-request-events).
+
+```bash
+curl --request GET \
+  --url https://api.formabledocs.com/api/v0/signature-requests/sr_456def/signed-envelope \
+  --header "Authorization: Bearer $TOKEN"
+```
+
+```json Response
+{
+  "signedEnvelopePresignedUrl": "https://s3.amazonaws.com/bucket/signed-envelope.pdf?..."
+}
+```
+
+Download that presigned URL promptly. Requesting it before signing finishes returns `409`.
+
+Webhook verification differs from Dropbox Sign's `event_hash`. Formable signs the raw body with HMAC-SHA256 and sends the digest in `Content-Sha256`. See [Verifying signatures](/webhooks/verifying-signatures) and [Webhooks overview](/webhooks/overview).
+
+## Differences to plan for
+
+<AccordionGroup>
+  <Accordion title="Template-first, not file-on-send">
+    Dropbox Sign can attach files on `create_embedded`. Formable expects a prepared [template](/walkthroughs/embedded-templates) first. Upload once, place fields, then send with `templateId`.
+  </Accordion>
+  <Accordion title="No hellosign-embedded client">
+    Load `signingUrl` in an iframe. There is no Formable equivalent of client events such as `sign` or `finish`. Drive UI state from webhooks or status polling instead.
+  </Accordion>
+  <Accordion title="Signing URL is request-scoped">
+    Dropbox Sign issues a `sign_url` per `signature_id`. Formable creates one from the `signatureRequestId`. You do not look up a separate signature ID just to embed signing.
+  </Accordion>
+  <Accordion title="Roles become array order">
+    Dropbox Sign `signers[].role` maps to template roles. Formable does not take role names on create; use the order of the `signers` array and field placement in the template editor.
+  </Accordion>
+</AccordionGroup>
+
+## Checklist
+
+<Steps>
+  <Step title="Create a Formable API key">
+    In [Settings](https://app.formabledocs.com/settings). Store it as a server secret.
+  </Step>
+  <Step title="Prepare templates">
+    Recreate documents and fields — or migrate the [embedded template flow](/migrations/dropbox-sign/embedded-templates) separately.
+  </Step>
+  <Step title="Swap create + sign URL calls">
+    Replace `create_embedded*` and `embedded/sign_url` with Formable endpoints. Prefer `signers` over a single `signer`.
+  </Step>
+  <Step title="Replace hellosign-embedded with an iframe">
+    Pass only the `signingUrl` from your backend.
+  </Step>
+  <Step title="Point webhooks at Formable">
+    Handle `document_signed` / `document_viewed` and verify `Content-Sha256`.
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Embedded templates migration" icon="file-lines" href="/migrations/dropbox-sign/embedded-templates">
+    Map `create_embedded_draft` and `edit_url` to Formable.
+  </Card>
+  <Card title="Embedded signing walkthrough" icon="window-maximize" href="/walkthroughs/embedded-signing">
+    Full Formable signing walkthrough.
+  </Card>
+  <Card title="Webhooks" icon="bell" href="/webhooks/overview">
+    Register endpoints and understand delivery.
+  </Card>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Bearer `fmbl_` API keys.
+  </Card>
+</CardGroup>

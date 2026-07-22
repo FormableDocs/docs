@@ -1,109 +1,84 @@
 ---
 title: "Authentication"
-description: "Authenticate requests with an OAuth 2.0 bearer token."
+description: "Authenticate API requests with an API key from Settings."
 ---
 
-The Formable API authenticates requests using **OAuth 2.0 client credentials**. You exchange a client ID and client secret for a short-lived access token, then send that token as a Bearer token on every request.
+The Formable API authenticates requests with a Bearer token in the `Authorization` header. Create an API key in [Settings](https://app.formabledocs.com/settings), then send it on every request.
 
-<Note>
-  Contact [support@formabledocs.com](mailto:support@formabledocs.com) to get API credentials for your organization. You'll receive a **client ID**, a **client secret**, and the **token URL** and **audience** to use.
-</Note>
+```bash
+Authorization: Bearer fmbl_YOUR_API_KEY
+```
 
-## Get an access token
+## Get an API key
 
-Request a token from your token URL using the client credentials grant. Pass the `audience` so the token is scoped to the Formable API.
+API keys belong to an organization. Create one in the Formable app, then copy the key when it's shown.
+
+<Steps>
+  <Step title="Create an organization">
+    Go to [Settings](https://app.formabledocs.com/settings) and create an organization if you don't have one yet. You need an organization before you can generate keys or register webhooks.
+  </Step>
+  <Step title="Generate a key">
+    In the **API keys** section, click **Generate key**, give it a name, and confirm.
+  </Step>
+  <Step title="Copy the key">
+    Copy the full key immediately and store it as an environment secret. Formable shows it **once** — after you close the dialog, only a short prefix (for example `fmbl_a1b2c3d4...`) remains visible.
+  </Step>
+</Steps>
+
+<Warning>
+  Never expose API keys in browser or mobile code. Call the API from your backend, and only pass short-lived signing and redline URLs to the client.
+</Warning>
+
+You can rename or delete keys from the same Settings page. Deleting a key revokes it immediately. Each account can have up to 25 active keys.
+
+## Use the key
+
+Include the key in the `Authorization` header of every API request.
 
 <CodeGroup>
 
 ```bash cURL
-curl --request POST \
-  --url https://YOUR_TENANT.auth0.com/oauth/token \
-  --header 'content-type: application/json' \
-  --data '{
-    "client_id": "YOUR_CLIENT_ID",
-    "client_secret": "YOUR_CLIENT_SECRET",
-    "audience": "https://api.formabledocs.com/api",
-    "grant_type": "client_credentials"
-  }'
+curl --request GET \
+  --url https://api.formabledocs.com/api/v0/signature-requests \
+  --header 'Authorization: Bearer fmbl_YOUR_API_KEY'
 ```
 
 ```javascript Node.js
-const res = await fetch("https://YOUR_TENANT.auth0.com/oauth/token", {
-  method: "POST",
-  headers: { "content-type": "application/json" },
-  body: JSON.stringify({
-    client_id: process.env.FORMABLE_CLIENT_ID,
-    client_secret: process.env.FORMABLE_CLIENT_SECRET,
-    audience: "https://api.formabledocs.com/api",
-    grant_type: "client_credentials",
-  }),
-});
-
-const { access_token } = await res.json();
+const res = await fetch(
+  "https://api.formabledocs.com/api/v0/signature-requests",
+  {
+    headers: {
+      Authorization: `Bearer ${process.env.FORMABLE_API_KEY}`,
+    },
+  },
+);
 ```
 
 ```python Python
 import os
 import requests
 
-res = requests.post(
-    "https://YOUR_TENANT.auth0.com/oauth/token",
-    json={
-        "client_id": os.environ["FORMABLE_CLIENT_ID"],
-        "client_secret": os.environ["FORMABLE_CLIENT_SECRET"],
-        "audience": "https://api.formabledocs.com/api",
-        "grant_type": "client_credentials",
-    },
+res = requests.get(
+    "https://api.formabledocs.com/api/v0/signature-requests",
+    headers={"Authorization": f"Bearer {os.environ['FORMABLE_API_KEY']}"},
 )
-
-access_token = res.json()["access_token"]
 ```
 
 </CodeGroup>
 
-A successful response returns an access token and its lifetime in seconds:
+Keys start with `fmbl_`. Treat them like passwords: store them in a secrets manager, rotate by creating a new key and deleting the old one, and never commit them to source control.
 
-```json
-{
-  "access_token": "eyJhbGciOiJSUzI1NiIsInR...",
-  "token_type": "Bearer",
-  "expires_in": 86400
-}
-```
+## Base URL
 
-## Use the token
-
-Include the access token in the `Authorization` header of every API request.
-
-```bash
-curl --request GET \
-  --url https://api.formabledocs.com/api/v0/signature-requests \
-  --header 'Authorization: Bearer YOUR_ACCESS_TOKEN'
-```
-
-<Tip>
-  Cache the access token and reuse it until it expires rather than requesting a new one per call. Refresh it when you receive a `401` response.
-</Tip>
-
-## Base URLs
-
-<CodeGroup>
-
-```text Production
+```text
 https://api.formabledocs.com/api
 ```
-
-```text Local
-http://localhost:4000/api
-```
-
-</CodeGroup>
 
 All endpoints are versioned under `/v0`, so a full URL looks like `https://api.formabledocs.com/api/v0/signature-requests`.
 
 ## Authorization errors
 
-Requests fail with a `401` when the bearer token is missing, malformed, or expired:
+Requests fail with a `401` when the bearer token is missing, malformed, revoked, or expired:
 
 ```json
 {
@@ -112,7 +87,3 @@ Requests fail with a `401` when the bearer token is missing, malformed, or expir
 ```
 
 A `403` means the token is valid but your organization isn't authorized for the resource — for example, creating an edit URL for a template that belongs to another organization.
-
-<Warning>
-  Never expose your client secret in browser or mobile code. Request tokens from a backend service, and only pass short-lived signing and redline URLs to the client.
-</Warning>

@@ -12,7 +12,7 @@ A **template** is a document you've uploaded (PDF or DOCX) with fields placed on
 - Create a template with [Create a template](/api-reference/endpoint/create-template).
 - Place fields using the **editor URL** returned on creation, or fetch a fresh one with [Create a template edit URL](/api-reference/endpoint/create-template-edit-url).
 
-See [Manage templates](/guides/templates) for the full workflow.
+See the [Embedded templates walkthrough](/walkthroughs/embedded-templates) for the full workflow.
 
 ## Signature requests
 
@@ -36,7 +36,7 @@ To let someone sign, generate a short-lived **signing URL** from the signature r
 Signing URLs are meant to be **embedded in an iframe** in your own product. They expire (typically after one hour), so generate them on demand right before you display them rather than storing them.
 
 <Warning>
-  Generate signing URLs from your backend and pass them to the client just-in-time. Never expose your API credentials in client-side code.
+  Generate signing URLs from your backend and pass them to the client just-in-time. Never expose your API keys in client-side code.
 </Warning>
 
 ## Test mode
@@ -54,4 +54,4 @@ Prefer webhooks for reacting in near real time, and use polling to backfill anyt
 
 ## Redlining (optional)
 
-Most integrations don't need this. [Redlining](/guides/redlining) is a separate workflow for negotiating a DOCX contract between two parties before signing. It uses **redline requests**, member roles, and turn-based rounds — see that guide when you're ready.
+Most integrations don't need this. [Redlining](/walkthroughs/redlining) is a separate workflow for negotiating a DOCX contract between two parties before signing. It uses **redline requests**, member roles, and turn-based rounds — see that walkthrough when you're ready.

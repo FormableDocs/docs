@@ -9,10 +9,6 @@
     {
       "url": "https://api.formabledocs.com/api",
       "description": "Production"
-    },
-    {
-      "url": "http://localhost:4000/api",
-      "description": "Local"
     }
   ],
   "security": [
@@ -158,7 +154,7 @@
       "post": {
         "summary": "Create a signature request",
         "operationId": "createSignatureRequest",
-        "description": "Creates a new signature request from a template. Requires a templateId, a signer (email and name), and a sender (email and name). Optionally accepts a fields array to pre-fill template fields before sending.",
+        "description": "Creates a new signature request from a template. Provide `signers` (preferred) or the deprecated `signer` field for a single recipient. Do not send both. Existing single-signer clients that pass `signer` continue to work. Optionally accepts a fields array to pre-fill template fields before sending.",
         "tags": ["Signature Requests"],
         "security": [{ "bearerAuth": [] }],
         "requestBody": {
@@ -167,28 +163,27 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["templateId", "signer", "sender"],
+                "required": ["templateId", "sender"],
                 "properties": {
                   "templateId": {
                     "type": "string",
                     "description": "The ID of the template to create a signature request for.",
                     "example": "abc123xyz"
                   },
+                  "signers": {
+                    "type": "array",
+                    "minItems": 1,
+                    "description": "Preferred. One or more people who will sign the document, in signing order.",
+                    "items": { "$ref": "#/components/schemas/Party" }
+                  },
                   "signer": {
-                    "type": "object",
-                    "required": ["email", "name"],
-                    "properties": {
-                      "email": { "type": "string", "format": "email", "description": "Email address of the signer.", "example": "signer@example.com" },
-                      "name": { "type": "string", "description": "Name of the signer.", "example": "Jane Doe" }
-                    }
+                    "allOf": [{ "$ref": "#/components/schemas/Party" }],
+                    "deprecated": true,
+                    "description": "Deprecated. Use `signers` instead. Treated as a single-element `signers` array."
                   },
                   "sender": {
-                    "type": "object",
-                    "required": ["email", "name"],
-                    "properties": {
-                      "email": { "type": "string", "format": "email", "description": "Email address of the sender.", "example": "sender@example.com" },
-                      "name": { "type": "string", "description": "Name of the sender.", "example": "John Smith" }
-                    }
+                    "allOf": [{ "$ref": "#/components/schemas/Party" }],
+                    "description": "The person or system sending the signature request."
                   },
                   "testMode": {
                     "type": "boolean",
@@ -206,6 +201,37 @@
                         "value": { "type": "string", "description": "The value to pre-fill in the field.", "example": "Acme Corporation" }
                       }
                     }
+                  }
+                }
+              },
+              "examples": {
+                "preferredMultipleSigners": {
+                  "summary": "Preferred — multiple signers",
+                  "value": {
+                    "templateId": "abc123xyz",
+                    "signers": [
+                      { "email": "jane@example.com", "name": "Jane Doe" },
+                      { "email": "bob@example.com", "name": "Bob Smith" }
+                    ],
+                    "sender": { "email": "sender@example.com", "name": "John Smith" }
+                  }
+                },
+                "preferredSingleSigner": {
+                  "summary": "Preferred — one signer via signers[]",
+                  "value": {
+                    "templateId": "abc123xyz",
+                    "signers": [
+                      { "email": "jane@example.com", "name": "Jane Doe" }
+                    ],
+                    "sender": { "email": "sender@example.com", "name": "John Smith" }
+                  }
+                },
+                "legacySingleSigner": {
+                  "summary": "Legacy — deprecated signer field",
+                  "value": {
+                    "templateId": "abc123xyz",
+                    "signer": { "email": "jane@example.com", "name": "Jane Doe" },
+                    "sender": { "email": "sender@example.com", "name": "John Smith" }
                   }
                 }
               }
@@ -839,8 +865,8 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "JWT",
-        "description": "OAuth 2.0 client credentials access token, passed as a Bearer token in the Authorization header."
+        "bearerFormat": "API key",
+        "description": "API key from Settings (starts with fmbl_), passed as a Bearer token in the Authorization header."
       }
     },
     "schemas": {
@@ -860,10 +886,20 @@
       },
       "SignatureRequest": {
         "type": "object",
-        "required": ["templateId", "signer", "sender", "status", "testMode"],
+        "required": ["templateId", "signer", "signers", "sender", "status", "testMode"],
         "properties": {
           "templateId": { "type": "string", "description": "The template ID associated with the signature request.", "example": "tmpl_abc123" },
-          "signer": { "$ref": "#/components/schemas/Party" },
+          "signers": {
+            "type": "array",
+            "minItems": 1,
+            "description": "All signers on the signature request, in signing order.",
+            "items": { "$ref": "#/components/schemas/Party" }
+          },
+          "signer": {
+            "allOf": [{ "$ref": "#/components/schemas/Party" }],
+            "deprecated": true,
+            "description": "Deprecated. Same as `signers[0]`. Kept so existing clients keep working."
+          },
           "sender": { "$ref": "#/components/schemas/Party" },
           "status": { "type": "string", "enum": ["Created", "Completed"], "description": "Current status of the signature request.", "example": "Created" },
           "testMode": { "type": "boolean", "description": "Whether the signature request is in test mode.", "example": false }

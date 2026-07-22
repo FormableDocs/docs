@@ -1,0 +1,307 @@
+---
+title: "DocuSign → Embedded signing"
+description: "Migrate DocuSign embedded signing (envelopes, recipient views) to the Formable API."
+sidebarTitle: "Embedded signing"
+---
+
+This guide helps you move a DocuSign embedded signing integration to Formable. You still create a send, mint a recipient signing URL, embed it, and download the completed PDF. You drop OAuth account paths, `clientUserId`, and `returnUrl` redirects in favor of Bearer API keys, a simpler create payload, and webhook- or poll-driven completion.
+
+If you also prepare templates inside your product, migrate that first with [DocuSign → Embedded templates](/migrations/docusign/embedded-templates). Formable signing always starts from a prepared template.
+
+<Info>
+  New to Formable? Complete the [Embedded signing walkthrough](/walkthroughs/embedded-signing) first, then use this page as a translation layer from DocuSign envelopes and recipient views.
+</Info>
+
+<Tip>
+  Prefer a white-glove migration? Email [matt@formabledocs.com](mailto:matt@formabledocs.com) and we'll handle moving your DocuSign integration to the Formable API.
+</Tip>
+
+## What you're moving
+
+In DocuSign you typically:
+
+1. Authenticate with OAuth and call account-scoped REST paths
+2. Create an envelope with a recipient that has a `clientUserId` (embedded / captive signer)
+3. Call `EnvelopeViews:createRecipientView` with matching identity fields plus a `returnUrl`
+4. Redirect or iframe the view URL (often ~5 minute TTL)
+5. Detect completion via Connect / `eventNotification` or the `returnUrl` query event, then download documents
+
+In Formable you:
+
+1. Authenticate with a Bearer API key (`fmbl_…`)
+2. Create a **signature request** from a `templateId` with `signers` and `sender`
+3. Mint a `signingUrl` (no `clientUserId`, no `returnUrl`)
+4. Load it in a plain iframe (URL lasts **1 hour**)
+5. Handle [`document_signed`](/webhooks/events#document_signed) or poll `status`, then download the signed envelope
+
+The product journey stays the same: prepare a document, send it, embed signing, react when done. The API surface is smaller and organization-scoped by the key rather than by `accountId` in the path.
+
+## Recommended order of work
+
+<Steps>
+  <Step title="Get a Formable API key">
+    Create an organization and key in [Settings](https://app.formabledocs.com/settings). See [Authentication](/authentication). You do not need JWT or Authorization Code exchange for the standard integration.
+  </Step>
+  <Step title="Migrate templates and field IDs">
+    Re-upload documents and place fields in Formable. If you embed template editing, follow [Embedded templates migration](/migrations/docusign/embedded-templates).
+  </Step>
+  <Step title="Replace Envelopes:create">
+    Map template roles and tab values to `signers`, `sender`, and optional `fields`.
+  </Step>
+  <Step title="Replace createRecipientView">
+    Call create signing URL; drop `clientUserId`, `returnUrl`, and `authenticationMethod`.
+  </Step>
+  <Step title="Swap Connect for Formable webhooks">
+    Register one org webhook URL and verify `Content-Sha256`. See [Webhooks](/webhooks/overview).
+  </Step>
+</Steps>
+
+## What's similar
+
+Several DocuSign ideas transfer directly:
+
+- A reusable **template** still backs many sends.
+- You still create a send unit (envelope → **signature request**), then open a short-lived URL for the signer.
+- Prefill / tab values still happen at send time; Formable uses `fields: [{ fieldId, value }]`.
+- Demo / non-billing traffic maps to `testMode: true` (instead of relying only on a demo account).
+- After completion you still fetch a combined signed PDF.
+
+If your DocuSign flow is "create envelope from template → create recipient view → iframe → Connect → download," you are remapping objects and removing embedded-signer bookkeeping, not redesigning the user journey.
+
+## What's different
+
+These DocuSign-specific pieces do not carry over:
+
+| Area | DocuSign | Formable |
+| --- | --- | --- |
+| Auth | OAuth access token + `/accounts/{accountId}/...` | Bearer `fmbl_…`; no `accountId` in the path |
+| Embedded marker | Recipient `clientUserId` | Embedded by default once you mint a `signingUrl` |
+| View request | Match email / userName / `clientUserId`; require `returnUrl` | POST create URL with only the `signatureRequestId` |
+| Completion UX | Often `returnUrl` redirect with an `event` query param | Keep the iframe; drive UI from webhooks or status polling |
+| View TTL | Commonly ~5 minutes | **1 hour** |
+| Webhooks | Connect / `eventNotification`, `X-DocuSign-Signature-1` | Org-level URL, `Content-Sha256` |
+| Roles | `templateRoles` / `roleName` | `signers` array order; roles aren't named on create |
+
+You no longer maintain a parallel "captive signer" identity. Create the request when you're ready to send, mint the URL when the user is ready to sign, and listen for completion out of band.
+
+## Concept map
+
+| DocuSign | Formable | Notes |
+| --- | --- | --- |
+| OAuth access token | API key (`Authorization: Bearer fmbl_…`) | No JWT / Auth Code for the standard integration. |
+| Account (`accountId`) | Organization | Implied by the API key. |
+| Envelope | Signature request | Formable's send unit. |
+| Recipient + `clientUserId` | Signer (`email` + `name`) | Embedded by default — no `clientUserId`. |
+| Recipient view URL | `signingUrl` | Expires after **1 hour** (DocuSign ~5 minutes). |
+| `returnUrl` | Not required | Detect completion via webhooks or polling. |
+| Connect / `eventNotification` | Webhooks | Org-level URL + `Content-Sha256`. |
+| Envelope `completed` | `document_signed` / status `Completed` | Then fetch the signed PDF. |
+
+## Endpoint map
+
+| DocuSign | Formable |
+| --- | --- |
+| `POST /v2.1/accounts/{accountId}/envelopes` | [`POST /v0/signature-requests`](/api-reference/endpoint/create-signature-request) |
+| `POST .../envelopes/{envelopeId}/views/recipient` | [`POST /v0/signature-requests/{id}/url`](/api-reference/endpoint/create-signing-url) |
+| Get document / combined PDF | [`GET /v0/signature-requests/{id}/signed-envelope`](/api-reference/endpoint/get-signed-envelope) |
+| Connect / `eventNotification` | Webhook URL in [Settings](https://app.formabledocs.com/settings) |
+
+## Auth
+
+DocuSign:
+
+```bash
+Authorization: Bearer {access_token}
+```
+
+against `/restapi/v2.1/accounts/{accountId}/...`.
+
+Formable:
+
+```bash
+curl https://api.formabledocs.com/api/v0/signature-requests \
+  --header "Authorization: Bearer fmbl_YOUR_API_KEY"
+```
+
+No `accountId` in the path. Create the key in [Settings](https://app.formabledocs.com/settings) and keep it on the server. Full details: [Authentication](/authentication).
+
+## Migrate the flow
+
+### 1. Create the signature request (was: create envelope)
+
+**DocuSign** (simplified):
+
+```json
+{
+  "templateId": "DOCUSIGN_TEMPLATE_ID",
+  "templateRoles": [
+    {
+      "email": "jane@example.com",
+      "name": "Jane Doe",
+      "roleName": "Signer",
+      "clientUserId": "1000",
+      "tabs": {
+        "textTabs": [
+          { "tabLabel": "company", "value": "Acme Corporation" }
+        ]
+      }
+    }
+  ],
+  "status": "sent"
+}
+```
+
+**Formable:**
+
+```bash
+curl --request POST \
+  --url https://api.formabledocs.com/api/v0/signature-requests \
+  --header "Authorization: Bearer $TOKEN" \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "templateId": "abc123xyz",
+    "signers": [
+      { "email": "jane@example.com", "name": "Jane Doe" }
+    ],
+    "sender": { "email": "you@yourcompany.com", "name": "Your Company" },
+    "fields": [
+      { "fieldId": "field_company_name", "value": "Acme Corporation" }
+    ],
+    "testMode": true
+  }'
+```
+
+```json Response
+{ "signatureRequestId": "sr_456def" }
+```
+
+Prefer the `signers` array. Map tab / merge values to `fields` using Formable `fieldId`s from the template editor (not DocuSign `tabLabel`s).
+
+| DocuSign | Formable |
+| --- | --- |
+| `templateId` | `templateId` |
+| `templateRoles[].email` / `name` | `signers[].email` / `name` |
+| `roleName` | Not used — order is the `signers` array |
+| `clientUserId` | Omit |
+| Tab values on the role | `fields: [{ fieldId, value }]` |
+| `status: "sent"` | Create, then mint the URL when ready |
+| Demo account testing | `testMode: true` |
+
+### 2. Create the signing URL (was: recipient view)
+
+**DocuSign:**
+
+```bash
+POST /v2.1/accounts/{accountId}/envelopes/{envelopeId}/views/recipient
+```
+
+```json
+{
+  "returnUrl": "https://yourapp.com/signing-complete",
+  "authenticationMethod": "none",
+  "email": "jane@example.com",
+  "userName": "Jane Doe",
+  "clientUserId": "1000"
+}
+```
+
+**Formable:**
+
+```bash
+curl --request POST \
+  --url https://api.formabledocs.com/api/v0/signature-requests/sr_456def/url \
+  --header "Authorization: Bearer $TOKEN"
+```
+
+```json Response
+{
+  "signingUrl": "https://app.formabledocs.com/sign/embedded/xyz789abc",
+  "expiresAt": "2024-01-16T10:30:00.000Z"
+}
+```
+
+No `clientUserId`, `returnUrl`, or `authenticationMethod`. You do not re-send the signer's email and name on the URL call. Formable URLs last **1 hour**. Creating a URL for an already completed request returns `409`.
+
+### 3. Embed on the client
+
+```html
+<iframe
+  src="https://app.formabledocs.com/sign/embedded/xyz789abc"
+  width="100%"
+  height="800"
+  allow="fullscreen"
+  style="border: none;"
+></iframe>
+```
+
+Detect completion with [`document_signed`](/webhooks/events#document_signed) or by polling `status` until `Completed`. Do not rely on a DocuSign-style `returnUrl` redirect to learn that signing finished. Update your UI when your backend confirms completion.
+
+### 4. Download the signed PDF
+
+```bash
+curl --request GET \
+  --url https://api.formabledocs.com/api/v0/signature-requests/sr_456def/signed-envelope \
+  --header "Authorization: Bearer $TOKEN"
+```
+
+```json Response
+{
+  "signedEnvelopePresignedUrl": "https://s3.amazonaws.com/bucket/signed-envelope.pdf?..."
+}
+```
+
+Webhook verification uses `Content-Sha256` instead of `X-DocuSign-Signature-1`. See [Verifying signatures](/webhooks/verifying-signatures) and [Webhooks overview](/webhooks/overview).
+
+## Differences to plan for
+
+<AccordionGroup>
+  <Accordion title="API keys instead of OAuth">
+    Drop JWT / Auth Code token exchange for a Bearer API key on your server. The organization is implied by the key, so paths omit `accountId`.
+  </Accordion>
+  <Accordion title="No clientUserId">
+    Embedded is the default. Create the request, then mint the URL when the user is ready. You do not mark recipients as captive at create time.
+  </Accordion>
+  <Accordion title="No returnUrl redirect">
+    Keep the iframe until webhook or poll says `Completed`, then update your UI. Build any "signing finished" screen in your own app.
+  </Accordion>
+  <Accordion title="Longer-lived signing URLs">
+    Plan refresh logic around a **1 hour** TTL instead of DocuSign's shorter recipient-view window. Still mint just in time; don't store URLs for later sessions.
+  </Accordion>
+</AccordionGroup>
+
+## Checklist
+
+<Steps>
+  <Step title="Create a Formable API key">
+    In [Settings](https://app.formabledocs.com/settings).
+  </Step>
+  <Step title="Prepare templates and field IDs">
+    Or migrate the [embedded template flow](/migrations/docusign/embedded-templates) separately.
+  </Step>
+  <Step title="Replace Envelopes:create">
+    Use create signature request with `signers`, `sender`, and optional `fields`. Prefer `signers` over a single `signer`.
+  </Step>
+  <Step title="Replace createRecipientView">
+    Call create signing URL; drop `clientUserId` / `returnUrl`.
+  </Step>
+  <Step title="Swap Connect for Formable webhooks">
+    Handle `document_signed` and download the signed envelope.
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Embedded templates migration" icon="file-lines" href="/migrations/docusign/embedded-templates">
+    Map DocuSign template edit views to Formable.
+  </Card>
+  <Card title="Embedded signing walkthrough" icon="window-maximize" href="/walkthroughs/embedded-signing">
+    Full Formable signing walkthrough.
+  </Card>
+  <Card title="Webhooks" icon="bell" href="/webhooks/overview">
+    Register endpoints and understand delivery.
+  </Card>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Bearer `fmbl_` API keys.
+  </Card>
+</CardGroup>

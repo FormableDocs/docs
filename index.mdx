@@ -7,18 +7,22 @@ The Formable API lets you collect signatures inside your application without bui
 
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
-    Authenticate and create your first signature request end to end.
+    Create an API key and send your first signature request end to end.
   </Card>
-  <Card title="E-signature workflow" icon="signature" href="/guides/e-signatures">
-    Prefill fields, embed signing, detect completion, and download the signed PDF.
+  <Card title="Embedded signing" icon="window-maximize" href="/walkthroughs/embedded-signing">
+    Server and client setup for signing inside your product.
   </Card>
-  <Card title="Manage templates" icon="file-lines" href="/guides/templates">
-    Upload PDF and DOCX files and place signature and form fields in the editor.
+  <Card title="Migrate from Dropbox Sign" icon="right-left" href="/migrations/dropbox-sign/embedded-signing">
+    Separate guides for embedded signing and embedded templates.
   </Card>
-  <Card title="Listen with webhooks" icon="bell" href="/webhooks/overview">
-    Get notified in real time when a document is viewed or signed.
+  <Card title="Migrate from DocuSign" icon="right-left" href="/migrations/docusign/embedded-signing">
+    Separate guides for embedded signing and embedded templates.
   </Card>
 </CardGroup>
+
+<Tip>
+  Prefer a white-glove migration? Email [matt@formabledocs.com](mailto:matt@formabledocs.com) and we'll handle moving your Dropbox Sign or DocuSign integration to the Formable API.
+</Tip>
 
 ## What you can build
 
@@ -43,9 +47,9 @@ The Formable API lets you collect signatures inside your application without bui
 </Steps>
 
 <Card title="Ready to make your first call?" icon="rocket" href="/quickstart" horizontal>
-  Follow the quickstart to authenticate and create your first signature request.
+  Follow the quickstart to create an API key and send your first signature request.
 </Card>
 
 ## Also available: redlining
 
-If you need turn-based contract negotiation before signing, Formable also offers a [redlining workflow](/guides/redlining). Most integrations only need e-signatures — you can ignore redlining until you need it.
+If you need turn-based contract negotiation before signing, Formable also offers an [embedded redlining](/walkthroughs/redlining) walkthrough. Most integrations only need e-signatures — you can ignore redlining until you need it.

@@ -1,13 +1,20 @@
 ---
-title: "Redlining workflow"
-description: "Run a turn-based contract negotiation between two parties."
+title: "Embedded redlining"
+description: "Run a turn-based contract negotiation between two parties inside your product."
 ---
 
-Redlining lets two parties negotiate revisions to a DOCX contract in turns. This guide walks through creating a redline request, generating member URLs, and tracking the negotiation until the document is ready to sign.
+Redlining lets two parties negotiate revisions to a DOCX contract in turns. You create a redline request on your server, then embed a member-specific redline URL in an iframe so each party can revise on their turn.
+
+This walkthrough covers creating a redline request, managing members, embedding redline URLs, and tracking the negotiation until the document is ready to sign.
 
 <Info>
-  Redlining edits the underlying document, so the template **must have a DOCX source file**. Creating a redline request for a template without one returns `404`.
+  Redlining edits the underlying document, so the template **must have a DOCX source file**. Creating a redline request for a template without one returns `404`. Most integrations only need [embedded signing](/walkthroughs/embedded-signing) — use redlining when you need negotiation before signature.
 </Info>
+
+## Prerequisites
+
+1. An [API key](/authentication) from [Settings](https://app.formabledocs.com/settings)
+2. A [template](/walkthroughs/embedded-templates) uploaded from a **DOCX** file
 
 ## Roles
 
@@ -20,7 +27,9 @@ A redline request has members, each with a role. The two core parties are set up
 | `DisclosingCounsel` | Helps the disclosing party. |
 | `ReceivingCounsel` | Helps the receiving party. |
 
-## 1. Create a redline request
+## Server side
+
+### 1. Create a redline request
 
 Provide the `templateId` and at least one member. Each member needs an `email`, `displayName`, and `role`.
 
@@ -35,7 +44,8 @@ curl --request POST \
       { "email": "legal@acme.com", "displayName": "Acme Legal", "role": "DisclosingParty" },
       { "email": "counsel@client.com", "displayName": "Client Counsel", "role": "ReceivingParty" }
     ],
-    "metadata": { "subject": "Mutual NDA" }
+    "metadata": { "subject": "Mutual NDA" },
+    "testMode": true
   }'
 ```
 
@@ -52,7 +62,7 @@ curl --request POST \
 
 The optional `metadata.subject` sets a subject line for the negotiation. Set `testMode: true` to keep the request out of billing while you integrate.
 
-## 2. Manage members
+### 2. Manage members
 
 Add or update members at any time — for example, to invite counsel — with [Update redline members](/api-reference/endpoint/put-redline-members). This replaces the member list, so send the full set.
 
@@ -70,9 +80,9 @@ curl --request PUT \
   }'
 ```
 
-## 3. Generate a redline URL for a member
+### 3. Generate a redline URL for a member
 
-Each member works on their turn through a member-specific redline URL. Pass the member's email — they must already be part of the request.
+Each member works on their turn through a member-specific redline URL. Pass the member's email — they must already be part of the request. Generate the URL just-in-time; it is short-lived.
 
 ```bash
 curl --request POST \
@@ -89,17 +99,27 @@ curl --request POST \
 }
 ```
 
-Embed the URL in an iframe for that member:
+## Client side
+
+Embed the `redlineUrl` in an iframe for that member:
 
 ```html
-<iframe src="https://app.formabledocs.com/redlining/embedded/xyz789abc" width="100%" height="800"></iframe>
+<iframe
+  src="https://app.formabledocs.com/redlining/embedded/xyz789abc"
+  width="100%"
+  height="800"
+  allow="fullscreen"
+  style="border: none;"
+></iframe>
 ```
 
+Generate the URL on your backend and pass only the URL to the client — the same pattern as [embedded signing](/walkthroughs/embedded-signing#client-side).
+
 <Tip>
-  If it isn't the member's turn, the URL opens in a read-only "out of turn" view. Generate the URL just-in-time — it's short-lived.
+  If it isn't the member's turn, the URL opens in a read-only "out of turn" view. Regenerate the URL if the member returns after it has expired.
 </Tip>
 
-## 4. Track the negotiation
+## Track the negotiation
 
 The `currentRound` field indicates whose turn it is (`Disclosing` or `Receiving`), and `status` tracks progress through the negotiation.
 
@@ -133,6 +153,19 @@ curl --request GET \
 
 For a full history of turn changes and review requests, read [redline request events](/api-reference/endpoint/get-redline-request-events). To sync many negotiations, use [List redline requests](/api-reference/endpoint/list-redline-requests) with `updatedSince`.
 
-## 5. Ready for signing
+You can also listen for redlining events on your [webhook endpoint](/webhooks/overview).
 
-When the negotiation reaches `DocumentReadyForSigning`, the finalized template can be sent through the [e-signature workflow](/guides/e-signatures) using the redline request's `templateId`.
+## Ready for signing
+
+When the negotiation reaches `DocumentReadyForSigning`, send the finalized template through the [embedded signing](/walkthroughs/embedded-signing) flow using the redline request's `templateId`.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Embedded signing" icon="window-maximize" href="/walkthroughs/embedded-signing">
+    Collect signatures on the finalized template.
+  </Card>
+  <Card title="Webhooks" icon="bell" href="/webhooks/overview">
+    Get notified as negotiation status changes.
+  </Card>
+</CardGroup>
