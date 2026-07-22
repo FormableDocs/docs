@@ -9,9 +9,13 @@ Every webhook request includes a signature so you can verify it was sent by Form
 
 Formable computes an **HMAC-SHA256** over the exact raw JSON body of the request, using your endpoint's signing secret as the key, and encodes the result as **base64**. That value is sent in the `Content-Sha256` header.
 
+Use the HMAC signing secret Formable showed once when you [registered the webhook](/developer-account#register-a-webhook). Store it as an environment secret and use that same value to verify every request.
+
 <Info>
   Your signing secret is provided as a **base64-encoded string**. Decode it to raw bytes and use those bytes as the HMAC key.
 </Info>
+
+If you misplaced the secret or don't remember it, Formable cannot show it again. Rotate it from **Settings → Webhooks → Rotate secret**, copy the new secret when it's shown, and update your environment. The previous secret stops working immediately.
 
 To verify a request:
 
@@ -108,5 +112,5 @@ def formable_webhook():
 </AccordionGroup>
 
 <Warning>
-  Keep your signing secret confidential and store it as an environment secret. If you believe it has been exposed, rotate it from **Settings → Webhooks → Rotate secret**.
+  Keep your signing secret confidential. If it is exposed, misplaced, or forgotten, rotate it from **Settings → Webhooks → Rotate secret** and update your verifier right away.
 </Warning>

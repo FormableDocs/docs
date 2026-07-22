@@ -26,8 +26,8 @@
           {
             "group": "Walkthroughs",
             "pages": [
-              "walkthroughs/embedded-signing",
               "walkthroughs/embedded-templates",
+              "walkthroughs/embedded-signing",
               "walkthroughs/redlining"
             ]
           },
@@ -37,15 +37,15 @@
               {
                 "group": "Dropbox Sign",
                 "pages": [
-                  "migrations/dropbox-sign/embedded-signing",
-                  "migrations/dropbox-sign/embedded-templates"
+                  "migrations/dropbox-sign/embedded-templates",
+                  "migrations/dropbox-sign/embedded-signing"
                 ]
               },
               {
                 "group": "DocuSign",
                 "pages": [
-                  "migrations/docusign/embedded-signing",
-                  "migrations/docusign/embedded-templates"
+                  "migrations/docusign/embedded-templates",
+                  "migrations/docusign/embedded-signing"
                 ]
               }
             ]
