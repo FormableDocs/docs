@@ -31,7 +31,7 @@ To let someone sign, generate a short-lived **signing URL** from the signature r
   An **envelope** is Formable's internal record of a document prepared for a recipient. As an API consumer you work with signature requests; the signed envelope endpoint is how you get the final PDF.
 </Info>
 
-## Signing URLs are short-lived and embeddable
+## Embedded Signing URLs are short-lived and embeddable
 
 Signing URLs are meant to be **embedded in an iframe** in your own product. They expire (typically after one hour), so generate them on demand right before you display them rather than storing them.
 

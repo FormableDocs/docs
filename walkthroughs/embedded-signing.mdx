@@ -178,9 +178,35 @@ function SigningFrame({ signatureRequestId }) {
 
 ## Detect completion
 
-When the signer finishes, the signature request `status` becomes `Completed`. You have three ways to learn that:
+When the signer finishes, the signature request `status` becomes `Completed`. You have four ways to learn that:
 
 <AccordionGroup>
+  <Accordion title="Listen for iframe postMessages" icon="window-maximize">
+    When signing finishes inside the embedded iframe, Formable posts a message to the parent window. Use this to close the iframe or update your UI immediately:
+
+    ```javascript
+    window.addEventListener("message", (event) => {
+      if (event.origin !== "https://app.formabledocs.com") return;
+      if (!event.data || typeof event.data !== "object") return;
+
+      switch (event.data.type) {
+        case "onSigningComplete":
+          // Signer finished — close the iframe or show a success state
+          break;
+        case "onSigningError":
+          // Signing failed to complete — show an error or retry
+          break;
+      }
+    });
+    ```
+
+    | Message `type` | When it fires |
+    | --- | --- |
+    | `onSigningComplete` | The signer successfully completed the document. |
+    | `onSigningError` | Signing could not be completed from the iframe. |
+
+    Always check `event.origin`. Treat these as client UX signals — confirm completion with a webhook or API poll before downloading the signed PDF.
+  </Accordion>
   <Accordion title="Listen for the document_signed webhook" icon="bell">
     Configure a [webhook endpoint](/webhooks/overview) and handle the [`document_signed`](/webhooks/events#document_signed) event. Formable pushes this once signing is complete, so you can react without polling.
 
@@ -217,7 +243,7 @@ When the signer finishes, the signature request `status` becomes `Completed`. Yo
 </AccordionGroup>
 
 <Tip>
-  Prefer the webhook for near real-time handling. Use [List signature requests](/api-reference/endpoint/list-signature-requests) with `updatedSince`, or the event stream, to reconcile anything you missed.
+  Use iframe `postMessage` for immediate UI updates, and prefer the webhook as the source of truth. Use [List signature requests](/api-reference/endpoint/list-signature-requests) with `updatedSince`, or the event stream, to reconcile anything you missed.
 </Tip>
 
 ## Download the signed PDF

@@ -149,9 +149,43 @@ function TemplateEditorFrame({ templateId }) {
 
 </CodeGroup>
 
+### Listen for editor events
+
+When the user saves in the embedded editor, Formable posts a message to the parent window. Listen for it to close the iframe or advance your UI:
+
+```javascript
+window.addEventListener("message", (event) => {
+  if (event.origin !== "https://app.formabledocs.com") return;
+  if (!event.data || typeof event.data !== "object") return;
+
+  switch (event.data.type) {
+    case "onTemplateEditorSaved":
+      // Template saved — close the iframe or move to the next step
+      break;
+    case "onTemplateEditorError":
+      // Save failed to notify the parent — show an error or retry
+      break;
+  }
+});
+```
+
+| Message `type` | When it fires |
+| --- | --- |
+| `onTemplateEditorSaved` | The user successfully saved the template in the editor. |
+| `onTemplateEditorError` | The editor could not deliver the save notification to the parent. |
+
+Always check `event.origin` before handling a message. These events are for client UX only — they are not a substitute for verifying template state on your backend before sending.
+
 ## Place fields in the editor
 
-In the embedded editor, place and configure fields on the document:
+In the embedded editor, use the **Field selector** to place and configure fields on the document.
+
+<Frame caption="The template editor with the Field selector open. Choose a field type, then place it on the document.">
+  <img
+    src="/static/images/template/new-template.png"
+    alt="Template editor showing document.docx with the Field selector sidebar listing Signature, Text, and other field types"
+  />
+</Frame>
 
 | Field | Use |
 | --- | --- |
@@ -161,7 +195,25 @@ In the embedded editor, place and configure fields on the document:
 | **Checkbox** | A boolean toggle |
 | **Amount** | A monetary value |
 
-Each field has an `id`. You reference these IDs when you [prefill fields](/walkthroughs/embedded-signing#prefill-fields) on a signature request.
+Select a placed field to set whether it's required and to copy its **Reference ID**. You reference these IDs when you [prefill fields](/walkthroughs/embedded-signing#prefill-fields) on a signature request.
+
+<Frame caption="A Signature field selected on the document. Copy the Reference ID from the sidebar for prefills.">
+  <img
+    src="/static/images/template/template-with-signature-field.png"
+    alt="Template editor with a Signature field selected over the Customer line, showing Required toggle and Reference ID in the sidebar"
+  />
+</Frame>
+
+Click **Preview** to walk through the document as a signer would see it, including required fields.
+
+<Frame caption="Preview mode highlights required fields and lets you step through them before saving.">
+  <img
+    src="/static/images/template/template-preview.png"
+    alt="Template preview showing a required Sign here field on the Customer signature line"
+  />
+</Frame>
+
+When you're done, click **Save template**. The editor posts `onTemplateEditorSaved` to the parent window.
 
 ## Next steps
 

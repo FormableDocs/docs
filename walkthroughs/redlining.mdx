@@ -119,6 +119,41 @@ Generate the URL on your backend and pass only the URL to the client — the sam
   If it isn't the member's turn, the URL opens in a read-only "out of turn" view. Regenerate the URL if the member returns after it has expired.
 </Tip>
 
+### Listen for editor events
+
+The redline editor posts messages to the parent window so you can close the iframe or advance your UI:
+
+```javascript
+window.addEventListener("message", (event) => {
+  if (event.origin !== "https://app.formabledocs.com") return;
+  if (!event.data || typeof event.data !== "object") return;
+
+  switch (event.data.type) {
+    case "onRedlineEditorSaved":
+      // Turn submitted or review finished — close the iframe
+      break;
+    case "onRedlineEditorError":
+      // Save failed — show an error or retry
+      break;
+    case "onRedlineEditorClosed":
+      // User confirmed exit without saving
+      break;
+    case "userRequestedToSign":
+      // User chose to proceed to signing without further revisions
+      break;
+  }
+});
+```
+
+| Message `type` | When it fires |
+| --- | --- |
+| `onRedlineEditorSaved` | The user submitted their turn or finished review. |
+| `onRedlineEditorError` | The editor could not complete the save/submit. |
+| `onRedlineEditorClosed` | The user closed the editor (for example after confirming exit). |
+| `userRequestedToSign` | The user chose to sign without requesting further changes. |
+
+Always check `event.origin`. Use these for client UX; confirm negotiation state with the API or [webhooks](/webhooks/overview).
+
 ## Track the negotiation
 
 The `currentRound` field indicates whose turn it is (`Disclosing` or `Receiving`), and `status` tracks progress through the negotiation.

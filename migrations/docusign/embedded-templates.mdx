@@ -166,7 +166,7 @@ This replaces DocuSign's template edit view call. Generate just-in-time on your 
 ></iframe>
 ```
 
-Pass only the `editUrl` to the browser — never the API key. Template editing uses the same iframe pattern as [embedded signing](/migrations/docusign/embedded-signing).
+Pass only the `editUrl` to the browser — never the API key. Template editing uses the same iframe pattern as [embedded signing](/migrations/docusign/embedded-signing). Listen for `onTemplateEditorSaved` when the user finishes editing — see [Embedded templates](/walkthroughs/embedded-templates#listen-for-editor-events).
 
 ## Tab → field mapping
 

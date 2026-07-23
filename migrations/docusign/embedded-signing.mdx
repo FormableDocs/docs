@@ -77,7 +77,7 @@ These DocuSign-specific pieces do not carry over:
 | Auth | OAuth access token + `/accounts/{accountId}/...` | Bearer `fmbl_…`; no `accountId` in the path |
 | Embedded marker | Recipient `clientUserId` | Embedded by default once you mint a `signingUrl` |
 | View request | Match email / userName / `clientUserId`; require `returnUrl` | POST create URL with only the `signatureRequestId` |
-| Completion UX | Often `returnUrl` redirect with an `event` query param | Keep the iframe; drive UI from webhooks or status polling |
+| Completion UX | Often `returnUrl` redirect with an `event` query param | `onSigningComplete` iframe message for UI; confirm with webhooks or polling |
 | View TTL | Commonly ~5 minutes | **1 hour** |
 | Webhooks | Connect / `eventNotification`, `X-DocuSign-Signature-1` | Org-level URL, `Content-Sha256` |
 | Roles | `templateRoles` / `roleName` | `signers` array order; roles aren't named on create |
@@ -93,7 +93,7 @@ You no longer maintain a parallel "captive signer" identity. Create the request 
 | Envelope | Signature request | Formable's send unit. |
 | Recipient + `clientUserId` | Signer (`email` + `name`) | Embedded by default — no `clientUserId`. |
 | Recipient view URL | `signingUrl` | Expires after **1 hour** (DocuSign ~5 minutes). |
-| `returnUrl` | Not required | Detect completion via webhooks or polling. |
+| `returnUrl` | `onSigningComplete` `postMessage` | Close the iframe from the client event; confirm via webhooks or polling. |
 | Connect / `eventNotification` | Webhooks | Org-level URL + `Content-Sha256`. |
 | Envelope `completed` | `document_signed` / status `Completed` | Then fetch the signed PDF. |
 
@@ -234,7 +234,18 @@ No `clientUserId`, `returnUrl`, or `authenticationMethod`. You do not re-send th
 ></iframe>
 ```
 
-Detect completion with [`document_signed`](/webhooks/events#document_signed) or by polling `status` until `Completed`. Do not rely on a DocuSign-style `returnUrl` redirect to learn that signing finished. Update your UI when your backend confirms completion.
+```javascript
+window.addEventListener("message", (event) => {
+  if (event.origin !== "https://app.formabledocs.com") return;
+  if (!event.data || typeof event.data !== "object") return;
+
+  if (event.data.type === "onSigningComplete") {
+    // signer finished — close the iframe or show success
+  }
+});
+```
+
+Use `onSigningComplete` instead of a DocuSign `returnUrl` redirect for client UX. Confirm completion with [`document_signed`](/webhooks/events#document_signed) or by polling `status` until `Completed` before downloading. See [Embedded signing](/walkthroughs/embedded-signing#detect-completion).
 
 ### 4. Download the signed PDF
 
@@ -262,7 +273,7 @@ Webhook verification uses `Content-Sha256` instead of `X-DocuSign-Signature-1`. 
     Embedded is the default. Create the request, then mint the URL when the user is ready. You do not mark recipients as captive at create time.
   </Accordion>
   <Accordion title="No returnUrl redirect">
-    Keep the iframe until webhook or poll says `Completed`, then update your UI. Build any "signing finished" screen in your own app.
+    Listen for `onSigningComplete` to update the client immediately. Confirm with a webhook or poll before downloading, then build any "signing finished" screen in your own app.
   </Accordion>
   <Accordion title="Longer-lived signing URLs">
     Plan refresh logic around a **1 hour** TTL instead of DocuSign's shorter recipient-view window. Still mint just in time; don't store URLs for later sessions.

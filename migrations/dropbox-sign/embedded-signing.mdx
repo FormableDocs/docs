@@ -76,8 +76,8 @@ Plan for these shifts early so you don't recreate Dropbox Sign patterns that For
 | App / client | API App + `client_id` on requests and in the JS client | Organization implied by the API key; omit `client_id` |
 | Files on send | `create_embedded` can attach files inline | Upload a [template](/walkthroughs/embedded-templates) first, then create the signature request |
 | Signing URL scope | One `sign_url` per `signature_id` | One `sign_url` per `signature_id` |
-| Client embed | `hellosign-embedded` + `client.open(...)` | Plain `<iframe src={signingUrl}>` |
-| Completion signal | Client events + callbacks (`signature_request_all_signed`, etc.) | Prefer [`document_signed`](/webhooks/events#document_signed); no Formable JS client events |
+| Client embed | `hellosign-embedded` + `client.open(...)` | Plain `<iframe src={signingUrl}>` + `window.postMessage` |
+| Completion signal | Client events + callbacks (`signature_request_all_signed`, etc.) | `onSigningComplete` iframe message for UI; prefer [`document_signed`](/webhooks/events#document_signed) as source of truth |
 | Webhook verification | `event_hash` | `Content-Sha256` HMAC — see [Verifying signatures](/webhooks/verifying-signatures) |
 
 Formable is intentionally template-first. If your Dropbox Sign code uploads PDFs on every `create_embedded`, move that upload into a one-time (or occasional) template create/edit step, then send with `templateId`.
@@ -91,9 +91,9 @@ Formable is intentionally template-first. If your Dropbox Sign code uploads PDFs
 | Signature request | Signature request | One send of a template to one or more signers. |
 | `signature_id` (per signer) | Not required for the URL | Formable mints a URL from the `signatureRequestId`. |
 | `sign_url` | `signingUrl` | Embed in an iframe. Expires after **1 hour**. |
-| `hellosign-embedded` | Plain `<iframe>` | No Formable JS SDK. |
+| `hellosign-embedded` | Plain `<iframe>` + `postMessage` | No Formable JS SDK. Listen for `onSigningComplete`. |
 | `test_mode: true` | `testMode: true` | Excluded from billing. |
-| `signature_request_all_signed` / `downloadable` | `document_signed` | Then fetch the signed PDF. |
+| `signature_request_all_signed` / `downloadable` | `onSigningComplete` + `document_signed` | Use the iframe message for UI; webhook before download. |
 
 ## Endpoint map
 
@@ -207,7 +207,7 @@ const client = new HelloSign({ clientId: "YOUR_CLIENT_ID" });
 client.open(signUrl, { skipDomainVerification: true });
 ```
 
-**Formable** — plain iframe (no SDK, no `client_id`, no `skipDomainVerification`):
+**Formable** — plain iframe + `postMessage` (no SDK, no `client_id`, no `skipDomainVerification`):
 
 ```html
 <iframe
@@ -219,11 +219,25 @@ client.open(signUrl, { skipDomainVerification: true });
 ></iframe>
 ```
 
-Mint the URL on your backend and pass only the URL to the browser. Never call Formable with your API key from client-side code.
+```javascript
+window.addEventListener("message", (event) => {
+  if (event.origin !== "https://app.formabledocs.com") return;
+  if (!event.data || typeof event.data !== "object") return;
+
+  if (event.data.type === "onSigningComplete") {
+    // signer finished — close the iframe or show success
+  }
+  if (event.data.type === "onSigningError") {
+    // signing failed — show an error or retry
+  }
+});
+```
+
+Mint the URL on your backend and pass only the URL to the browser. Never call Formable with your API key from client-side code. See [Embedded signing](/walkthroughs/embedded-signing#detect-completion) for the full event list.
 
 ### 4. Detect completion and download the PDF
 
-Prefer the [`document_signed`](/webhooks/events#document_signed) webhook over polling. You can also poll signature request `status` until it is `Completed`, or read the [event stream](/api-reference/endpoint/get-signature-request-events).
+Use `onSigningComplete` to update the client immediately. Prefer the [`document_signed`](/webhooks/events#document_signed) webhook (or poll signature request `status` until `Completed`) before downloading. You can also read the [event stream](/api-reference/endpoint/get-signature-request-events).
 
 ```bash
 curl --request GET \
@@ -247,8 +261,8 @@ Webhook verification differs from Dropbox Sign's `event_hash`. Formable signs th
   <Accordion title="Template-first, not file-on-send">
     Dropbox Sign can attach files on `create_embedded`. Formable expects a prepared [template](/walkthroughs/embedded-templates) first. Upload once, place fields, then send with `templateId`.
   </Accordion>
-  <Accordion title="No hellosign-embedded client">
-    Load `signingUrl` in an iframe. There is no Formable equivalent of client events such as `sign` or `finish`. Drive UI state from webhooks or status polling instead.
+  <Accordion title="No hellosign-embedded — use iframe postMessage">
+    Load `signingUrl` in an iframe. Listen for `onSigningComplete` / `onSigningError` instead of Dropbox Sign client events such as `sign` or `finish`. Confirm completion with webhooks or status polling before downloading the PDF.
   </Accordion>
   <Accordion title="Signing URL is request-scoped">
     Dropbox Sign issues a `sign_url` per `signature_id`. Formable creates one from the `signatureRequestId`. You do not look up a separate signature ID just to embed signing.
