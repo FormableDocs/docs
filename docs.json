@@ -54,7 +54,7 @@
             "group": "Webhooks",
             "pages": [
               "webhooks/overview",
-              "webhooks/verifying-signatures",
+              "webhooks/verifying-webhooks",
               "webhooks/events"
             ]
           }

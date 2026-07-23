@@ -23,7 +23,7 @@ A **signature request** is one send of a template to one signer. It captures the
 | `signer` | The person who signs the document (`email` + `name`). |
 | `sender` | The person or organization sending it (`email` + `name`). |
 | `status` | `Created` when made, `Completed` once signed. |
-| `testMode` | When `true`, the request doesn't count toward billing. |
+| `testMode` | When `true`, the request doesn't count toward billing. Documents are watermarked and not legally binding. |
 
 To let someone sign, generate a short-lived **signing URL** from the signature request and embed it in an iframe. When signing finishes, download the **signed envelope** — a temporary URL to the completed PDF.
 
@@ -41,7 +41,7 @@ Signing URLs are meant to be **embedded in an iframe** in your own product. They
 
 ## Test mode
 
-Signature requests accept a `testMode` flag. Use it while integrating so activity doesn't count toward billing.
+Signature requests accept a `testMode` flag. Use it while integrating so activity doesn't count toward billing. Test mode documents are watermarked and are not legally binding.
 
 ## Events
 

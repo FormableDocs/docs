@@ -90,7 +90,7 @@ Templates can include fields beyond the signature — company name, dates, check
 
 #### Test mode
 
-Set `testMode: true` while integrating so the request doesn't count toward billing.
+Set `testMode: true` while integrating so the request doesn't count toward billing. Test mode documents are watermarked and are not legally binding.
 
 ### 2. Generate a signing URL
 
@@ -175,6 +175,37 @@ function SigningFrame({ signatureRequestId }) {
 <Tip>
   Give the iframe enough height (around `800px`) so signers don't have to scroll within a small frame. Regenerate the URL if the signer returns after it has expired.
 </Tip>
+
+## Signing experience
+
+Once the iframe loads, the signer walks through required fields on the document.
+
+Click **Start** to begin. Required fields are highlighted so the signer knows where to act.
+
+<Frame caption="The signing experience with a required Signature field highlighted. Click Start to begin.">
+  <img
+    src="/static/images/embedded-signing/signing-start.png"
+    alt="Embedded signing view showing document.docx with a Sign here field on the Customer line, a Required callout, and a Start button"
+  />
+</Frame>
+
+When the signer reaches a Signature field, they can **Draw**, **Type**, or use a **Saved** signature. They must agree to the terms and conditions before confirming.
+
+<Frame caption="The signature modal with Draw selected. Signers can also type a signature or reuse a saved one.">
+  <img
+    src="/static/images/embedded-signing/signing-signature.png"
+    alt="Signature modal over the document with Draw, Type, and Saved tabs, a drawn signature, consent checkbox, and Confirm button"
+  />
+</Frame>
+
+After all required fields are complete, the signer reviews the document and clicks **Finish**. That completes the signature request and fires `onSigningComplete` to the parent window.
+
+<Frame caption="Review step after the signature is placed. Click Finish to complete the request.">
+  <img
+    src="/static/images/embedded-signing/signing-finish.png"
+    alt="Embedded signing view with a completed Customer signature and a Finish button"
+  />
+</Frame>
 
 ## Detect completion
 

@@ -56,7 +56,7 @@ Register your webhook URL in [Settings](https://app.formabledocs.com/settings) a
     In the **Webhooks** section, click **Register webhook**, enter the HTTPS URL that should receive events, and confirm. Production URLs must use `https://`.
   </Step>
   <Step title="Save your signing secret">
-    Copy the signing secret shown once after registration and store it as an environment secret. You'll use it to [verify signatures](/webhooks/verifying-signatures). Formable does not show the secret again.
+    Copy the signing secret shown once after registration and store it as an environment secret. You'll use it to [verify wehbhooks](/webhooks/verifying-webhooks). Formable does not show the secret again.
   </Step>
 </Steps>
 
@@ -88,7 +88,7 @@ Return a `200` status code as soon as you've received the event. If you have hea
 
 ## Retries
 
-Formable does **not** automatically retry failed deliveries today. Failures are logged and monitored on our side. To stay resilient:
+Formable automatically retry failed deliveries. However, to stay resilient:
 
 - Make your endpoint highly available and fast to respond.
 - Use the [events endpoints](/api-reference/endpoint/get-signature-request-events) to reconcile any events you may have missed during downtime.
@@ -109,7 +109,7 @@ res.sendStatus(200);
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Verify signatures" icon="shield-check" href="/webhooks/verifying-signatures">
+  <Card title="Verify webhooks" icon="shield-check" href="/webhooks/verifying-webhooks">
     Confirm each request genuinely came from Formable.
   </Card>
   <Card title="Event catalog" icon="list" href="/webhooks/events">

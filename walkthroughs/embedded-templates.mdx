@@ -1,14 +1,17 @@
 ---
 title: "Embedded templates"
-description: "Let users create and edit templates inside your product with an embeddable editor URL."
+description: "Create templates in your product for use with the signing API. Upload a file, embed the editor, then send with a signature request."
 ---
 
 Give your users the ability to upload documents and place signature fields directly in your product. Formable returns a short-lived `editUrl` that you load in an iframe — the same embedding pattern as [embedded signing](/walkthroughs/embedded-signing).
+
+Templates you create here are what you pass to the [signing API](/walkthroughs/embedded-signing). After the user places fields and saves, reuse the `templateId` to create signature requests (ie let users sign the template).
 
 This walkthrough covers uploading a file, embedding the template editor, placing fields, and regenerating an editor URL when it expires.
 
 ## Prerequisites
 
+- A [developer account](https://docs.formabledocs.com/developer-account)
 - An [API key](/authentication) from [Settings](https://app.formabledocs.com/settings)
 - A PDF or Word document under 40MB
 - Call the Formable API from your **backend** only
@@ -36,10 +39,14 @@ Maximum size: **40MB**.
   <Step title="Embed the editor">
     Load the `editUrl` in an iframe so users place fields in your product.
   </Step>
-  <Step title="Reuse the templateId">
-    Create signature requests (or redline requests) from the prepared template.
+  <Step title="Send with the signing API">
+    Pass the `templateId` into a [signature request](/walkthroughs/embedded-signing) (or a redline request) to collect signatures.
   </Step>
 </Steps>
+
+<Tip>
+  The embedded editor prepares the document. The [embedded signing](/walkthroughs/embedded-signing) walkthrough is how you send that same `templateId` for signature.
+</Tip>
 
 ## Server side
 
@@ -65,7 +72,7 @@ curl --request POST \
 }
 ```
 
-Save the `templateId` — you'll pass it when creating [signature requests](/walkthroughs/embedded-signing) (and redline requests).
+Save the `templateId`. This is the ID you pass to the signing API when you [create a signature request](/walkthroughs/embedded-signing) (and when you create redline requests).
 
 <Warning>
   Files over 40MB return `413`. Unsupported file types return `400` with `"Unsupported file type, only pdf, docx, and doc are supported"`.
@@ -195,7 +202,7 @@ In the embedded editor, use the **Field selector** to place and configure fields
 | **Checkbox** | A boolean toggle |
 | **Amount** | A monetary value |
 
-Select a placed field to set whether it's required and to copy its **Reference ID**. You reference these IDs when you [prefill fields](/walkthroughs/embedded-signing#prefill-fields) on a signature request.
+Select a placed field to set whether it's required and to copy its **Reference ID**. You can reference these IDs if you decide to [prefill fields](/walkthroughs/embedded-signing#prefill-fields) on a signature request.
 
 <Frame caption="A Signature field selected on the document. Copy the Reference ID from the sidebar for prefills.">
   <img
@@ -204,7 +211,7 @@ Select a placed field to set whether it's required and to copy its **Reference I
   />
 </Frame>
 
-Click **Preview** to walk through the document as a signer would see it, including required fields.
+(Optional) Click **Preview** to walk through the document as a signer would see it, including required fields.
 
 <Frame caption="Preview mode highlights required fields and lets you step through them before saving.">
   <img
@@ -213,13 +220,15 @@ Click **Preview** to walk through the document as a signer would see it, includi
   />
 </Frame>
 
-When you're done, click **Save template**. The editor posts `onTemplateEditorSaved` to the parent window.
+When you're done, click **Save template**. The editor posts `onTemplateEditorSaved` to the parent window, which you can process to close the iframe.
 
 ## Next steps
 
+Your template is ready for the signing API. Pass the `templateId` from this walkthrough into a signature request to collect signatures.
+
 <CardGroup cols={2}>
   <Card title="Embedded signing" icon="window-maximize" href="/walkthroughs/embedded-signing">
-    Send the template for signature and embed the signing experience.
+    Use this template with the signing API — create a signature request and embed the signing experience.
   </Card>
   <Card title="Redlining" icon="pen-line" href="/walkthroughs/redlining">
     Negotiate revisions on a DOCX template before signing.

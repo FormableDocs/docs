@@ -187,7 +187,7 @@
                   },
                   "testMode": {
                     "type": "boolean",
-                    "description": "Optional flag to mark the signature request as a test. Test mode requests are not counted toward billing.",
+                    "description": "Optional flag to mark the signature request as a test. Test mode requests are not counted toward billing. Documents are watermarked and are not legally binding.",
                     "example": false
                   },
                   "fields": {
@@ -511,7 +511,7 @@
                   },
                   "testMode": {
                     "type": "boolean",
-                    "description": "Optional flag to enable test mode for the redline request. Defaults to false.",
+                    "description": "Optional flag to enable test mode for the redline request. Defaults to false. Test mode documents are watermarked and are not legally binding.",
                     "example": false
                   },
                   "metadata": {
@@ -902,7 +902,7 @@
           },
           "sender": { "$ref": "#/components/schemas/Party" },
           "status": { "type": "string", "enum": ["Created", "Completed"], "description": "Current status of the signature request.", "example": "Created" },
-          "testMode": { "type": "boolean", "description": "Whether the signature request is in test mode.", "example": false }
+          "testMode": { "type": "boolean", "description": "Whether the signature request is in test mode. Test mode documents are watermarked and are not legally binding.", "example": false }
         }
       },
       "RedlineMemberInput": {
@@ -942,7 +942,7 @@
             "description": "List of members in the redline request.",
             "items": { "$ref": "#/components/schemas/RedlineMember" }
           },
-          "testMode": { "type": "boolean", "description": "Whether the redline request is in test mode." },
+          "testMode": { "type": "boolean", "description": "Whether the redline request is in test mode. Test mode documents are watermarked and are not legally binding." },
           "currentRound": {
             "type": "string",
             "enum": ["Disclosing", "Receiving"],

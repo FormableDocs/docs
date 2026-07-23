@@ -60,7 +60,7 @@ Much of the Dropbox Sign model still maps cleanly:
 
 - You still create a **signature request** on the server, then open a short-lived URL in the browser.
 - Templates remain the reusable document definition. One template powers many sends.
-- `test_mode` / `testMode` keeps integration traffic out of billing.
+- `test_mode` / `testMode` keeps integration traffic out of billing. Test mode documents are watermarked and are not legally binding.
 - You still download a completed PDF after everyone has signed.
 - Signing URLs are meant to be generated **just in time**, not stored long-term. Dropbox Sign `sign_url` values last about 60 minutes and same with Formable `signingUrl`.
 
@@ -78,7 +78,7 @@ Plan for these shifts early so you don't recreate Dropbox Sign patterns that For
 | Signing URL scope | One `sign_url` per `signature_id` | One `sign_url` per `signature_id` |
 | Client embed | `hellosign-embedded` + `client.open(...)` | Plain `<iframe src={signingUrl}>` + `window.postMessage` |
 | Completion signal | Client events + callbacks (`signature_request_all_signed`, etc.) | `onSigningComplete` iframe message for UI; prefer [`document_signed`](/webhooks/events#document_signed) as source of truth |
-| Webhook verification | `event_hash` | `Content-Sha256` HMAC — see [Verifying signatures](/webhooks/verifying-signatures) |
+| Webhook verification | `event_hash` | `Content-Sha256` HMAC — see [Verifying webhooks](/webhooks/verifying-webhooks) |
 
 Formable is intentionally template-first. If your Dropbox Sign code uploads PDFs on every `create_embedded`, move that upload into a one-time (or occasional) template create/edit step, then send with `templateId`.
 
@@ -92,7 +92,7 @@ Formable is intentionally template-first. If your Dropbox Sign code uploads PDFs
 | `signature_id` (per signer) | Not required for the URL | Formable mints a URL from the `signatureRequestId`. |
 | `sign_url` | `signingUrl` | Embed in an iframe. Expires after **1 hour**. |
 | `hellosign-embedded` | Plain `<iframe>` + `postMessage` | No Formable JS SDK. Listen for `onSigningComplete`. |
-| `test_mode: true` | `testMode: true` | Excluded from billing. |
+| `test_mode: true` | `testMode: true` | Excluded from billing. Documents are watermarked and not legally binding. |
 | `signature_request_all_signed` / `downloadable` | `onSigningComplete` + `document_signed` | Use the iframe message for UI; webhook before download. |
 
 ## Endpoint map
@@ -253,7 +253,7 @@ curl --request GET \
 
 Download that presigned URL promptly. Requesting it before signing finishes returns `409`.
 
-Webhook verification differs from Dropbox Sign's `event_hash`. Formable signs the raw body with HMAC-SHA256 and sends the digest in `Content-Sha256`. See [Verifying signatures](/webhooks/verifying-signatures) and [Webhooks overview](/webhooks/overview).
+Webhook verification differs from Dropbox Sign's `event_hash`. Formable signs the raw body with HMAC-SHA256 and sends the digest in `Content-Sha256`. See [Verifying webhooks](/webhooks/verifying-webhooks) and [Webhooks overview](/webhooks/overview).
 
 ## Differences to plan for
 

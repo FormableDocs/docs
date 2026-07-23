@@ -63,7 +63,7 @@ Several DocuSign ideas transfer directly:
 - A reusable **template** still backs many sends.
 - You still create a send unit (envelope → **signature request**), then open a short-lived URL for the signer.
 - Prefill / tab values still happen at send time; Formable uses `fields: [{ fieldId, value }]`.
-- Demo / non-billing traffic maps to `testMode: true` (instead of relying only on a demo account).
+- Demo / non-billing traffic maps to `testMode: true` (instead of relying only on a demo account). Test mode documents are watermarked and are not legally binding.
 - After completion you still fetch a combined signed PDF.
 
 If your DocuSign flow is "create envelope from template → create recipient view → iframe → Connect → download," you are remapping objects and removing embedded-signer bookkeeping, not redesigning the user journey.
@@ -185,7 +185,7 @@ Prefer the `signers` array. Map tab / merge values to `fields` using Formable `f
 | `clientUserId` | Omit |
 | Tab values on the role | `fields: [{ fieldId, value }]` |
 | `status: "sent"` | Create, then mint the URL when ready |
-| Demo account testing | `testMode: true` |
+| Demo account testing | `testMode: true` (watermarked, not legally binding) |
 
 ### 2. Create the signing URL (was: recipient view)
 
@@ -261,7 +261,7 @@ curl --request GET \
 }
 ```
 
-Webhook verification uses `Content-Sha256` instead of `X-DocuSign-Signature-1`. See [Verifying signatures](/webhooks/verifying-signatures) and [Webhooks overview](/webhooks/overview).
+Webhook verification uses `Content-Sha256` instead of `X-DocuSign-Signature-1`. See [Verifying webhooks](/webhooks/verifying-webhooks) and [Webhooks overview](/webhooks/overview).
 
 ## Differences to plan for
 
