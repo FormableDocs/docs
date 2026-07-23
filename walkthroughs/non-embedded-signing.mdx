@@ -1,0 +1,196 @@
+---
+title: "Non-embedded signing"
+description: "Send a document for signature by email. Formable delivers the signing link."
+---
+
+Send a document for signature without embedding Formable in your product. 
+You create a regular signature request with one or more signers, and Formable emails each person a signing link.
+
+Use this flow when signers should complete the document in their browser from an email.
+
+<Info>
+  Prefer signing inside your product? See [Embedded signing](/walkthroughs/embedded-signing) instead.
+</Info>
+
+## Prerequisites
+
+Before you begin:
+
+1. Create an organization and [API key](/authentication) in [Settings](https://app.formabledocs.com/settings).
+2. Upload a template and place at least one signature field — see the [Embedded templates walkthrough](/walkthroughs/embedded-templates).
+3. Call the Formable API from your **backend** only. Never expose your API key in the browser.
+
+## Overview
+
+<Steps>
+  <Step title="Create a regular signature request">
+    Start a request from a template with one or more signers. Formable emails each signer automatically.
+  </Step>
+  <Step title="Signer completes the document">
+    The signer opens the link from email and fills required fields on Formable.
+  </Step>
+  <Step title="Detect completion and download">
+    Listen for webhooks or poll status, then fetch the signed PDF.
+  </Step>
+</Steps>
+
+## Create a regular signature request
+
+Call this from your backend when you're ready to send. A regular signature request needs:
+
+- `templateId` — which document to send
+- `signers` — who will sign (`email` + `name`), in signing order
+
+Unlike [embedded signature requests](/api-reference/endpoint/create-signature-request), you do **not** generate a signing URL. Formable creates the shares and emails each signer for you.
+
+```bash
+curl --request POST \
+  --url https://api.formabledocs.com/api/v0/regular-signature-requests \
+  --header "Authorization: Bearer $TOKEN" \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "templateId": "abc123xyz",
+    "signers": [
+      { "email": "jane@example.com", "name": "Jane Doe" },
+      { "email": "bob@example.com", "name": "Bob Smith" }
+    ],
+    "testMode": true
+  }'
+```
+
+```json Response
+{ "signatureRequestId": "sr_456def" }
+```
+
+Save the `signatureRequestId`. You'll use it to track progress and download the signed PDF.
+
+<Tip>
+  Each signer receives an email with a link to `/sign/{envelopeShareId}` — the same style of link used when you share from the Formable app.
+</Tip>
+
+### Test mode
+
+Set `testMode: true` while integrating so the request doesn't count toward billing. Test mode documents are watermarked and are not legally binding.
+
+## Signing experience
+
+Signers open the link from their email and complete required fields on Formable.
+
+Click **Start** to begin. Required fields are highlighted so the signer knows where to act.
+
+<Frame caption="The signing experience with a required Signature field highlighted. Click Start to begin.">
+  <img
+    src="/static/images/embedded-signing/signing-start.png"
+    alt="Signing view showing document.docx with a Sign here field on the Customer line, a Required callout, and a Start button"
+  />
+</Frame>
+
+When the signer reaches a Signature field, they can **Draw**, **Type**, or use a **Saved** signature. They must agree to the terms and conditions before confirming.
+
+<Frame caption="The signature modal with Draw selected. Signers can also type a signature or reuse a saved one.">
+  <img
+    src="/static/images/embedded-signing/signing-signature.png"
+    alt="Signature modal over the document with Draw, Type, and Saved tabs, a drawn signature, consent checkbox, and Confirm button"
+  />
+</Frame>
+
+After all required fields are complete, the signer reviews the document and clicks **Finish**.
+
+<Frame caption="Review step after the signature is placed. Click Finish to complete the request.">
+  <img
+    src="/static/images/embedded-signing/signing-finish.png"
+    alt="Signing view with a completed Customer signature and a Finish button"
+  />
+</Frame>
+
+## Detect completion
+
+When signing finishes, the signature request `status` becomes `Completed`. You have three ways to learn that:
+
+<AccordionGroup>
+  <Accordion title="Listen for the document_signed webhook" icon="bell">
+    Configure a [webhook endpoint](/webhooks/overview) and handle the [`document_signed`](/webhooks/events#document_signed) event. Formable pushes this once signing is complete, so you can react without polling.
+
+    ```json
+    {
+      "event": {
+        "event_type": "document_signed",
+        "event_category": "signing"
+      },
+      "signing": {
+        "signature_request_id": "sr_456def"
+      }
+    }
+    ```
+  </Accordion>
+  <Accordion title="Poll the signature request status" icon="magnifying-glass">
+    Fetch the [signature request](/api-reference/endpoint/get-signature-request) and check `status`. It moves from `Created` to `Completed`.
+
+    ```bash
+    curl --request GET \
+      --url https://api.formabledocs.com/api/v0/signature-requests/sr_456def \
+      --header "Authorization: Bearer $TOKEN"
+    ```
+  </Accordion>
+  <Accordion title="Read the event stream" icon="list">
+    Fetch [signature request events](/api-reference/endpoint/get-signature-request-events) for a chronological history of what happened.
+
+    ```bash
+    curl --request GET \
+      --url https://api.formabledocs.com/api/v0/signature-requests/sr_456def/events \
+      --header "Authorization: Bearer $TOKEN"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<Tip>
+  Prefer the webhook as the source of truth. Use [List signature requests](/api-reference/endpoint/list-signature-requests) with `updatedSince`, or the event stream, to reconcile anything you missed.
+</Tip>
+
+## Download the signed PDF
+
+Once status is `Completed`, fetch a temporary download URL for the signed PDF (the **signed envelope**).
+
+```bash
+curl --request GET \
+  --url https://api.formabledocs.com/api/v0/signature-requests/sr_456def/signed-envelope \
+  --header "Authorization: Bearer $TOKEN"
+```
+
+```json Response
+{
+  "signedEnvelopePresignedUrl": "https://s3.amazonaws.com/bucket/signed-envelope.pdf?..."
+}
+```
+
+Open or download that URL promptly — it is a short-lived presigned link.
+
+<Note>
+  Requesting the signed envelope before signing is complete returns `409` with `"Envelope has not been signed yet"`.
+</Note>
+
+## Embedded vs non-embedded
+
+| | Embedded | Non-embedded |
+| --- | --- | --- |
+| Endpoint | [`POST /v0/signature-requests`](/api-reference/endpoint/create-signature-request) | [`POST /v0/regular-signature-requests`](/api-reference/endpoint/create-regular-signature-request) |
+| Delivery | You generate a [signing URL](/api-reference/endpoint/create-signing-url) and embed it | Formable emails each signer |
+| UI | Iframe in your product | Formable hosted page from email link |
+| Best for | In-app signing flows | Email-based signing outside your app |
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Embedded signing" icon="window-maximize" href="/walkthroughs/embedded-signing">
+    Embed the signing experience in an iframe inside your product.
+  </Card>
+  <Card title="Embedded templates" icon="file-lines" href="/walkthroughs/embedded-templates">
+    Upload documents and place signature and form fields.
+  </Card>
+  <Card title="Webhooks" icon="bell" href="/webhooks/overview">
+    Get notified when a document is viewed or signed.
+  </Card>
+  <Card title="API reference" icon="code" href="/api-reference/endpoint/create-regular-signature-request">
+    Full docs for creating a regular signature request.
+  </Card>
+</CardGroup>

@@ -25,7 +25,7 @@ A **signature request** is one send of a template to one signer. It captures the
 | `status` | `Created` when made, `Completed` once signed. |
 | `testMode` | When `true`, the request doesn't count toward billing. Documents are watermarked and not legally binding. |
 
-To let someone sign, generate a short-lived **signing URL** from the signature request and embed it in an iframe. When signing finishes, download the **signed envelope** — a temporary URL to the completed PDF.
+To let someone sign inside your product, generate a short-lived **signing URL** from the signature request and embed it in an iframe. For email-based signing without an iframe, create a [regular signature request](/walkthroughs/non-embedded-signing) instead — Formable emails each signer for you. When signing finishes, download the **signed envelope** — a temporary URL to the completed PDF.
 
 <Info>
   An **envelope** is Formable's internal record of a document prepared for a recipient. As an API consumer you work with signature requests; the signed envelope endpoint is how you get the final PDF.

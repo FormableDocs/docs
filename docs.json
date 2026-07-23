@@ -28,6 +28,7 @@
             "pages": [
               "walkthroughs/embedded-templates",
               "walkthroughs/embedded-signing",
+              "walkthroughs/non-embedded-signing",
               "walkthroughs/redlining"
             ]
           },
@@ -88,6 +89,7 @@
             "group": "Signature Requests",
             "pages": [
               "api-reference/endpoint/create-signature-request",
+              "api-reference/endpoint/create-regular-signature-request",
               "api-reference/endpoint/list-signature-requests",
               "api-reference/endpoint/get-signature-request",
               "api-reference/endpoint/create-signing-url",
