@@ -5,11 +5,20 @@ description: "Confirm that a webhook request genuinely came from Formable."
 
 Every webhook request includes a signature so you can verify it was sent by Formable and wasn't tampered with in transit. Always verify the signature before acting on a webhook.
 
-## How signing works
+## How HMAC validation works
 
-Formable computes an **HMAC-SHA256** over the exact raw JSON body of the request, using your endpoint's signing secret as the key, and encodes the result as **base64**. That value is sent in the `Content-Sha256` header.
+Anyone who learns your webhook URL could send a fake `POST` to it. HMAC Signature verification stops that: Formable and your server share a secret that only the two of you know. On every delivery, Formable uses that secret to stamp the request body, and you check the stamp before trusting the event.
 
-Use the HMAC signing secret Formable showed once when you [registered the webhook](/developer-account#register-a-webhook). Store it as an environment secret and use that same value to verify every request.
+Think of it like a wax seal on a letter:
+
+1. Formable takes the exact request body and your signing secret, and runs them through a one-way function (HMAC-SHA256). The result is a short fingerprint.
+2. That fingerprint is sent in the `Content-Sha256` header.
+3. Your server repeats the same calculation with the same secret and the raw body you received.
+4. If your fingerprint matches the header, the body came from Formable and wasn't altered. If it doesn't match, reject the request.
+
+An attacker without the secret can't forge a matching fingerprint. Changing even one character of the body produces a different fingerprint, so tampering is caught too.
+
+Use the signing secret Formable showed once when you [registered the webhook](/developer-account#register-a-webhook). Store it as an environment secret and use that same value to verify every request.
 
 <Info>
   Your signing secret is provided as a **base64-encoded string**. Decode it to raw bytes and use those bytes as the HMAC key.
