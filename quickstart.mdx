@@ -3,7 +3,7 @@ title: "Embedded Signing Quickstart"
 description: "Create your first signature request and get an embeddable signing URL."
 ---
 
-This guide takes you from zero to a live, embeddable signing session. You'll upload a document, send it for signature, and generate a URL your signer can open.
+This quickstart takes about **10 minutes**. In just **4 API calls**, you go from a plain PDF or DOCX to a signed document with an audit trail.
 
 ## Prerequisites
 
@@ -43,6 +43,13 @@ Before you begin, you need:
     <Tip>
       Open the `editUrl` in a browser to place signature, text, and date fields on the document. See [Embedded templates](/walkthroughs/embedded-templates).
     </Tip>
+
+    <Frame caption="Place a Signature field on the document, then click Save template.">
+      <img
+        src="/static/images/template/template-with-signature-field.png"
+        alt="Template editor with a Signature field selected over the Customer line, showing Required toggle and Reference ID in the sidebar"
+      />
+    </Frame>
   </Step>
 
   <Step title="Create a signature request">
@@ -88,6 +95,13 @@ Before you begin, you need:
     ```html
     <iframe src="https://app.formabledocs.com/sign/embedded/xyz789abc" width="100%" height="800"></iframe>
     ```
+
+    <Frame caption="The signer clicks Start and completes each required field on the document.">
+      <img
+        src="/static/images/embedded-signing/signing-start.png"
+        alt="Embedded signing view showing document.docx with a Sign here field on the Customer line, a Required callout, and a Start button"
+      />
+    </Frame>
   </Step>
 
   <Step title="Retrieve the signed document">
@@ -108,6 +122,15 @@ Before you begin, you need:
     <Note>
       This endpoint returns `409` until the document is signed. Poll [signature request events](/api-reference/endpoint/get-signature-request-events) or check the [signature request](/api-reference/endpoint/get-signature-request) `status` to know when it's `Completed`.
     </Note>
+
+    The signed PDF includes an audit trail with created, sent, signed, and completed events.
+
+    <Frame caption="Every signed document includes an audit trail with timestamps and actors.">
+      <img
+        src="/static/images/embedded-signing/signed-doc-with-audit-trail.png"
+        alt="Formable audit trail for document.docx showing Created, Sent, Signed, and Completed events with status Completed"
+      />
+    </Frame>
   </Step>
 </Steps>
 
