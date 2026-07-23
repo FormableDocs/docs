@@ -47,6 +47,13 @@
                   "migrations/docusign/embedded-templates",
                   "migrations/docusign/embedded-signing"
                 ]
+              },
+              {
+                "group": "Adobe Acrobat Sign",
+                "pages": [
+                  "migrations/adobe-acrobat-sign/embedded-templates",
+                  "migrations/adobe-acrobat-sign/embedded-signing"
+                ]
               }
             ]
           },
@@ -143,6 +150,10 @@
     {
       "source": "/migrations/docusign",
       "destination": "/migrations/docusign/embedded-signing"
+    },
+    {
+      "source": "/migrations/adobe-acrobat-sign",
+      "destination": "/migrations/adobe-acrobat-sign/embedded-signing"
     }
   ],
   "logo": {

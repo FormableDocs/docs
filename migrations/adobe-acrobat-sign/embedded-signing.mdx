@@ -1,0 +1,321 @@
+---
+title: "Adobe Acrobat Sign → Embedded signing"
+description: "Migrate Adobe Acrobat Sign agreements and signing URLs to the Formable API."
+sidebarTitle: "Embedded signing"
+---
+
+This guide helps you move an Adobe Acrobat Sign embedded signing integration to Formable. You still create a send, mint a signing URL, embed it, and download the completed PDF. You drop OAuth, regional hosts, transient documents on every send, and `OUT_FOR_SIGNATURE` polling in favor of Bearer API keys, template-first sends, and webhook- or poll-driven completion.
+
+If you also prepare library documents or authoring views inside your product, migrate that first with [Adobe Acrobat Sign → Embedded templates](/migrations/adobe-acrobat-sign/embedded-templates). Formable signing always starts from a prepared template.
+
+<Info>
+  New to Formable? Complete the [Embedded signing walkthrough](/walkthroughs/embedded-signing) first, then use this page as a translation layer from Acrobat Sign agreements and signing URLs.
+</Info>
+
+<Tip>
+  Prefer a white-glove migration? Email [matt@formabledocs.com](mailto:matt@formabledocs.com) and we'll handle moving your Adobe Acrobat Sign integration to the Formable API.
+</Tip>
+
+## What you're moving
+
+In Adobe Acrobat Sign you typically:
+
+1. Authenticate with OAuth (and often `x-api-user` / on-behalf-of headers) against a regional host such as `api.na1.adobesign.com`
+2. Upload a transient document, or reference a library document
+3. `POST /agreements` with `participantSetsInfo` and `state: "IN_PROCESS"`
+4. Poll until the agreement is `OUT_FOR_SIGNATURE`, then call `GET /agreements/{agreementId}/signingUrls` (or `POST .../views` with a `SIGNING` view)
+5. Embed or redirect to the signing URL, detect completion via webhooks or status polling, then download the combined PDF
+
+In Formable you:
+
+1. Authenticate with a Bearer API key (`fmbl_…`)
+2. Create a **signature request** from a `templateId` with `signers` and `sender`
+3. Mint a `signingUrl` (no transient document, no regional host, no status wait)
+4. Load it in a plain iframe (URL lasts **1 hour**)
+5. Handle [`document_signed`](/webhooks/events#document_signed) or poll `status`, then download the signed envelope
+
+The product journey stays the same: prepare a document, send it, embed signing, react when done. The API surface is smaller and organization-scoped by the key.
+
+## Recommended order of work
+
+<Steps>
+  <Step title="Get a Formable API key">
+    Create an organization and key in [Settings](https://app.formabledocs.com/settings). See [Authentication](/authentication). You do not need OAuth token exchange for the standard integration.
+  </Step>
+  <Step title="Migrate templates and field IDs">
+    Re-upload documents and place fields in Formable. If you embed library authoring, follow [Embedded templates migration](/migrations/adobe-acrobat-sign/embedded-templates).
+  </Step>
+  <Step title="Replace POST /agreements">
+    Map participants and merge fields to `signers`, `sender`, and optional `fields`.
+  </Step>
+  <Step title="Replace signingUrls / SIGNING views">
+    Call create signing URL; drop regional hosts and `OUT_FOR_SIGNATURE` polling.
+  </Step>
+  <Step title="Swap Acrobat Sign webhooks for Formable webhooks">
+    Register one org webhook URL and verify `Content-Sha256`. See [Webhooks](/webhooks/overview).
+  </Step>
+</Steps>
+
+## What's similar
+
+Several Acrobat Sign ideas transfer directly:
+
+- A reusable **library document / template** still backs many sends.
+- You still create a send unit (agreement → **signature request**), then open a short-lived URL for the signer.
+- Prefill / merge values still happen at send time; Formable uses `fields: [{ fieldId, value }]`.
+- Sandbox / non-production traffic maps to `testMode: true`. Test mode documents are watermarked and are not legally binding.
+- After completion you still fetch a combined signed PDF.
+
+If your Acrobat Sign flow is "create agreement → get signing URL → iframe → webhook → download," you are remapping objects and removing transient-document and regional-host bookkeeping, not redesigning the user journey.
+
+## What's different
+
+These Acrobat Sign-specific pieces do not carry over:
+
+| Area | Adobe Acrobat Sign | Formable |
+| --- | --- | --- |
+| Auth | OAuth access token; often `x-api-user` | Bearer `fmbl_…`; no acting-as headers |
+| Base URL | Regional (`api.na1.adobesign.com`, etc.) | `https://api.formabledocs.com` |
+| Files on send | Transient document or library document on create | Upload a [template](/walkthroughs/embedded-templates) first, then send with `templateId` |
+| Ready-to-sign | Poll until `OUT_FOR_SIGNATURE` before signing URLs | Create the request, then mint the URL when ready |
+| Signing URL | `GET .../signingUrls` or `POST .../views` (`SIGNING`) | `POST .../signature-requests/{id}/url` |
+| Completion UX | Redirect / return URL options on some views | `onSigningComplete` iframe message for UI; confirm with webhooks or polling |
+| View TTL | Short-lived signing URLs | **1 hour** |
+| Webhooks | Acrobat Sign webhook subscriptions + event names | Org-level URL, `Content-Sha256` |
+| Participants | `participantSetsInfo` with `order` / `role` | `signers` array order; roles aren't named on create |
+
+You no longer upload a transient document per send or wait for Acrobat Sign's async agreement state machine. Create the request when you're ready to send, mint the URL when the user is ready to sign, and listen for completion out of band.
+
+## Concept map
+
+| Adobe Acrobat Sign | Formable | Notes |
+| --- | --- | --- |
+| OAuth access token | API key (`Authorization: Bearer fmbl_…`) | No OAuth for the standard integration. |
+| Account / `x-api-user` | Organization | Implied by the API key. |
+| Agreement | Signature request | Formable's send unit. |
+| Participant set member | Signer (`email` + `name`) | Embedded by default once you mint a `signingUrl`. |
+| Library document | Template | Prepared once; reused via `templateId`. |
+| Transient document | Template upload | Do not re-upload on every send. |
+| Signing URL | `signingUrl` | Expires after **1 hour**. |
+| `AGREEMENT_WORKFLOW_COMPLETED` / similar | `document_signed` / status `Completed` | Then fetch the signed PDF. |
+| Combined document | Signed envelope | Presigned PDF download URL. |
+
+## Endpoint map
+
+| Adobe Acrobat Sign | Formable |
+| --- | --- |
+| `POST /api/rest/v6/transientDocuments` + `POST /agreements` | Upload a [template](/walkthroughs/embedded-templates), then [`POST /v0/signature-requests`](/api-reference/endpoint/create-signature-request) |
+| `POST /agreements` with `libraryDocumentId` | [`POST /v0/signature-requests`](/api-reference/endpoint/create-signature-request) with `templateId` |
+| `GET /agreements/{id}/signingUrls` | [`POST /v0/signature-requests/{id}/url`](/api-reference/endpoint/create-signing-url) |
+| `POST /agreements/{id}/views` (`SIGNING`) | [`POST /v0/signature-requests/{id}/url`](/api-reference/endpoint/create-signing-url) |
+| `GET /agreements/{id}/combinedDocument` | [`GET /v0/signature-requests/{id}/signed-envelope`](/api-reference/endpoint/get-signed-envelope) |
+| Webhook subscriptions | Webhook URL in [Settings](https://app.formabledocs.com/settings) |
+
+## Auth
+
+Acrobat Sign:
+
+```bash
+Authorization: Bearer {access_token}
+```
+
+against a regional host such as `https://api.na1.adobesign.com/api/rest/v6/...`, often with `x-api-user`.
+
+Formable:
+
+```bash
+curl https://api.formabledocs.com/api/v0/signature-requests \
+  --header "Authorization: Bearer fmbl_YOUR_API_KEY"
+```
+
+One global API host. No `x-api-user`. Create the key in [Settings](https://app.formabledocs.com/settings) and keep it on the server. Full details: [Authentication](/authentication).
+
+## Migrate the flow
+
+### 1. Create the signature request (was: create agreement)
+
+**Adobe Acrobat Sign** (simplified, from a library document):
+
+```json
+{
+  "fileInfos": [
+    {
+      "libraryDocumentId": "ADOBE_LIBRARY_DOCUMENT_ID"
+    }
+  ],
+  "name": "Customer Agreement",
+  "participantSetsInfo": [
+    {
+      "memberInfos": [{ "email": "jane@example.com" }],
+      "order": 1,
+      "role": "SIGNER"
+    }
+  ],
+  "signatureType": "ESIGN",
+  "state": "IN_PROCESS",
+  "mergeFieldInfo": [
+    { "fieldName": "company", "defaultValue": "Acme Corporation" }
+  ]
+}
+```
+
+**Formable:**
+
+```bash
+curl --request POST \
+  --url https://api.formabledocs.com/api/v0/signature-requests \
+  --header "Authorization: Bearer $TOKEN" \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "templateId": "abc123xyz",
+    "signers": [
+      { "email": "jane@example.com", "name": "Jane Doe" }
+    ],
+    "sender": { "email": "you@yourcompany.com", "name": "Your Company" },
+    "fields": [
+      { "fieldId": "field_company_name", "value": "Acme Corporation" }
+    ],
+    "testMode": true
+  }'
+```
+
+```json Response
+{ "signatureRequestId": "sr_456def" }
+```
+
+Prefer the `signers` array. Map merge field names to Formable `fieldId`s from the template editor (not Acrobat Sign `fieldName`s). Pass a `sender` on every create.
+
+| Adobe Acrobat Sign | Formable |
+| --- | --- |
+| `libraryDocumentId` | `templateId` |
+| `transientDocumentId` on create | Upload a template first; do not attach files on send |
+| `participantSetsInfo[].memberInfos[].email` | `signers[].email` / `name` |
+| `order` / `role` | Not used — order is the `signers` array |
+| `mergeFieldInfo` | `fields: [{ fieldId, value }]` |
+| `state: "IN_PROCESS"` | Create, then mint the URL when ready |
+| Sandbox / non-billing testing | `testMode: true` (watermarked, not legally binding) |
+
+### 2. Create the signing URL (was: signingUrls / SIGNING view)
+
+**Adobe Acrobat Sign:**
+
+```bash
+GET /api/rest/v6/agreements/{agreementId}/signingUrls
+```
+
+Often after polling `GET /agreements/{agreementId}` until status is `OUT_FOR_SIGNATURE`.
+
+**Formable:**
+
+```bash
+curl --request POST \
+  --url https://api.formabledocs.com/api/v0/signature-requests/sr_456def/url \
+  --header "Authorization: Bearer $TOKEN"
+```
+
+```json Response
+{
+  "signingUrl": "https://app.formabledocs.com/sign/embedded/xyz789abc",
+  "expiresAt": "2024-01-16T10:30:00.000Z"
+}
+```
+
+No regional host, no `OUT_FOR_SIGNATURE` wait, and no separate views payload. Formable URLs last **1 hour**. Creating a URL for an already completed request returns `409`.
+
+### 3. Embed on the client
+
+```html
+<iframe
+  src="https://app.formabledocs.com/sign/embedded/xyz789abc"
+  width="100%"
+  height="800"
+  allow="fullscreen"
+  style="border: none;"
+></iframe>
+```
+
+```javascript
+window.addEventListener("message", (event) => {
+  if (event.origin !== "https://app.formabledocs.com") return;
+  if (!event.data || typeof event.data !== "object") return;
+
+  if (event.data.type === "onSigningComplete") {
+    // signer finished — close the iframe or show success
+  }
+});
+```
+
+Use `onSigningComplete` for client UX instead of relying only on a return / redirect URL. Confirm completion with [`document_signed`](/webhooks/events#document_signed) or by polling `status` until `Completed` before downloading. See [Embedded signing](/walkthroughs/embedded-signing#detect-completion).
+
+### 4. Download the signed PDF
+
+```bash
+curl --request GET \
+  --url https://api.formabledocs.com/api/v0/signature-requests/sr_456def/signed-envelope \
+  --header "Authorization: Bearer $TOKEN"
+```
+
+```json Response
+{
+  "signedEnvelopePresignedUrl": "https://s3.amazonaws.com/bucket/signed-envelope.pdf?..."
+}
+```
+
+Webhook verification uses `Content-Sha256`. See [Verifying webhooks](/webhooks/verifying-webhooks) and [Webhooks overview](/webhooks/overview).
+
+## Differences to plan for
+
+<AccordionGroup>
+  <Accordion title="API keys instead of OAuth">
+    Drop OAuth token exchange and `x-api-user` headers for a Bearer API key on your server. The organization is implied by the key.
+  </Accordion>
+  <Accordion title="Template-first, not transient-document-on-send">
+    Acrobat Sign often uploads a transient document per agreement. Formable expects a prepared [template](/walkthroughs/embedded-templates) first. Upload once, place fields, then send with `templateId`.
+  </Accordion>
+  <Accordion title="No OUT_FOR_SIGNATURE polling">
+    You do not wait for an async agreement state before minting a signing URL. Create the signature request, then call create signing URL when the signer is ready.
+  </Accordion>
+  <Accordion title="One global API host">
+    Drop regional base URL discovery (`api.na1`, `api.eu1`, and similar). All Formable calls go to `https://api.formabledocs.com`.
+  </Accordion>
+  <Accordion title="iframe postMessage instead of return URL alone">
+    Listen for `onSigningComplete` to update the client immediately. Confirm with a webhook or poll before downloading, then build any "signing finished" screen in your own app.
+  </Accordion>
+</AccordionGroup>
+
+## Checklist
+
+<Steps>
+  <Step title="Create a Formable API key">
+    In [Settings](https://app.formabledocs.com/settings).
+  </Step>
+  <Step title="Prepare templates and field IDs">
+    Or migrate the [embedded template flow](/migrations/adobe-acrobat-sign/embedded-templates) separately.
+  </Step>
+  <Step title="Replace POST /agreements">
+    Use create signature request with `signers`, `sender`, and optional `fields`. Prefer `signers` over a single `signer`.
+  </Step>
+  <Step title="Replace signingUrls / SIGNING views">
+    Call create signing URL; drop regional hosts and status waits.
+  </Step>
+  <Step title="Swap Acrobat Sign webhooks for Formable webhooks">
+    Handle `document_signed` and download the signed envelope.
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Embedded templates migration" icon="file-lines" href="/migrations/adobe-acrobat-sign/embedded-templates">
+    Map library documents and authoring views to Formable.
+  </Card>
+  <Card title="Embedded signing walkthrough" icon="window-maximize" href="/walkthroughs/embedded-signing">
+    Full Formable signing walkthrough.
+  </Card>
+  <Card title="Webhooks" icon="bell" href="/webhooks/overview">
+    Register endpoints and understand delivery.
+  </Card>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Bearer `fmbl_` API keys.
+  </Card>
+</CardGroup>

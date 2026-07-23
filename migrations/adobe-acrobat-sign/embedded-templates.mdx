@@ -1,0 +1,253 @@
+---
+title: "Adobe Acrobat Sign → Embedded templates"
+description: "Migrate Adobe Acrobat Sign library documents and authoring views to Formable's upload and editUrl flow."
+sidebarTitle: "Embedded templates"
+---
+
+This guide helps you move Adobe Acrobat Sign library document creation and embedded authoring to Formable. You still upload a document, open an editor for field placement, and reuse a template ID when sending. Formable collapses that into a multipart upload plus an `editUrl` iframe, without OAuth, regional hosts, or transient documents.
+
+When templates are ready, continue with [Adobe Acrobat Sign → Embedded signing](/migrations/adobe-acrobat-sign/embedded-signing) to send documents for signature.
+
+<Info>
+  New to Formable? Complete the [Embedded templates walkthrough](/walkthroughs/embedded-templates) first, then use this page as a translation layer from Acrobat Sign library documents and authoring views.
+</Info>
+
+<Tip>
+  Prefer a white-glove migration? Email [matt@formabledocs.com](mailto:matt@formabledocs.com) and we'll handle moving your Adobe Acrobat Sign integration to the Formable API.
+</Tip>
+
+## What you're moving
+
+In Adobe Acrobat Sign apps you typically:
+
+1. `POST /transientDocuments` to upload the file
+2. `POST /libraryDocuments` (or create an agreement in `AUTHORING` state) to prepare a reusable document
+3. Optionally open an authoring / `EDIT` view (`POST /libraryDocuments/{id}/views` or agreement views) so users place form fields in your product
+4. Send agreements from that library document ID, often with `mergeFieldInfo`
+
+In Formable you:
+
+1. `POST /v0/templates` with the file
+2. Embed `editUrl` so users place fields in your product
+3. Copy each field's `id` for later prefills
+4. Create signature requests with that `templateId` and a `signers` array
+
+You are migrating document preparation and in-product editing. Agreement send and signing URLs live on the paired [signing guide](/migrations/adobe-acrobat-sign/embedded-signing).
+
+## Recommended order of work
+
+<Steps>
+  <Step title="Get a Formable API key">
+    Create an organization and key in [Settings](https://app.formabledocs.com/settings). See [Authentication](/authentication).
+  </Step>
+  <Step title="Re-upload each library document">
+    Call [`POST /v0/templates`](/api-reference/endpoint/create-template) with PDF or Word files (max 40MB).
+  </Step>
+  <Step title="Replace authoring / EDIT views">
+    Embed `editUrl` from create, or [`POST .../edit-url`](/api-reference/endpoint/create-template-edit-url) when it expires.
+  </Step>
+  <Step title="Map form field names to fieldIds">
+    Place fields in the Formable editor and update prefill code to use `fieldId` instead of Acrobat Sign form / merge field names.
+  </Step>
+  <Step title="Send with the new templateId">
+    Continue with [embedded signing migration](/migrations/adobe-acrobat-sign/embedded-signing).
+  </Step>
+</Steps>
+
+## What's similar
+
+The high-level template model still matches Acrobat Sign:
+
+- Upload once, get a reusable template ID, send many times.
+- Users can edit field placement inside your product via a short-lived editor URL.
+- Prefills happen at send time against named field identifiers.
+- Template editing and signing use the same auth story on Formable (one Bearer key for both).
+
+If your Acrobat Sign product already embeds an authoring view and stores a library document ID for later agreement creates, keep that product flow. Rebuild how the file is uploaded and how the editor URL is minted.
+
+## What's different
+
+Plan for these Acrobat Sign-specific patterns that do not map 1:1:
+
+| Area | Adobe Acrobat Sign | Formable |
+| --- | --- | --- |
+| Auth | OAuth + regional hosts; often `x-api-user` | Bearer `fmbl_…`; organization from the key |
+| Upload path | Transient document, then library document or AUTHORING agreement | One multipart `POST /templates` |
+| Field placement | Authoring UI, form field generators, or `PUT .../formFields` | Visual placement in Formable's editor |
+| Prefill keys | Form field / merge field names | `fieldId` from the Formable editor |
+| Edit view | Library `EDIT` view or agreement authoring view | `editTemplateAccess.editUrl` or `POST .../edit-url` |
+| Editor TTL | View expiration from Acrobat Sign | Default about **1 day**; mint just in time |
+| Roles on create | Participant sets / roles on library or agreement | Fields in the editor; `signers` at send time |
+
+Anchor text generators, absolute coordinates in form-field payloads, and per-send AUTHORING agreements do not carry over as the primary path. Recreate positions in the Formable editor, then store the new `fieldId`s in your database or config.
+
+## Concept map
+
+| Adobe Acrobat Sign | Formable | Notes |
+| --- | --- | --- |
+| Library document | Template | Upload once, reuse `templateId`. |
+| Transient document | File upload on create template | No separate transient ID to manage. |
+| Form fields (signature, text, date, …) | Fields (Signature, Text, Date, …) | Placed in Formable's visual editor. |
+| Library `EDIT` / authoring view URL | `editUrl` | Embed in an iframe. Expires (default **1 day**). |
+| Merge / form field names | `fieldId` | Prefill by ID at signature-request time. |
+| Participant roles on the library | Signers at send time | Roles aren't declared on template create. |
+
+## Endpoint map
+
+| Adobe Acrobat Sign | Formable |
+| --- | --- |
+| `POST /transientDocuments` + `POST /libraryDocuments` | [`POST /v0/templates`](/api-reference/endpoint/create-template) |
+| `POST /libraryDocuments/{id}/views` (`EDIT`) | [`POST /v0/templates/{templateId}/edit-url`](/api-reference/endpoint/create-template-edit-url) |
+| Agreement `AUTHORING` + authoring view | Formable template `editUrl` (prepare once, not per send) |
+| `editUrl` / view URL on create | `editTemplateAccess.editUrl` returned from create |
+
+## Auth
+
+Acrobat Sign library APIs sit under regional `/api/rest/v6/...` hosts with an OAuth token. Formable uses the same Bearer key as signing:
+
+```bash
+curl https://api.formabledocs.com/api/v0/templates \
+  --header "Authorization: Bearer fmbl_YOUR_API_KEY" \
+  --form 'file=@./agreement.pdf' \
+  --form 'filename=agreement.pdf'
+```
+
+See [Authentication](/authentication). Call these endpoints from your backend only.
+
+## Migrate the flow
+
+### 1. Upload the template
+
+**Adobe Acrobat Sign** (simplified):
+
+```bash
+# 1) Upload transient document
+POST /api/rest/v6/transientDocuments
+
+# 2) Create library document from transientDocumentId
+POST /api/rest/v6/libraryDocuments
+```
+
+**Formable** — one call:
+
+```bash
+curl --request POST \
+  --url https://api.formabledocs.com/api/v0/templates \
+  --header "Authorization: Bearer $TOKEN" \
+  --form 'file=@./agreement.pdf' \
+  --form 'filename=agreement.pdf'
+```
+
+```json Response
+{
+  "templateId": "abc123xyz",
+  "editTemplateAccess": {
+    "editUrl": "https://app.formabledocs.com/template-setup/abc123xyz",
+    "expiresAt": "2024-01-16T10:30:00.000Z"
+  }
+}
+```
+
+There is no separate transient document step. The organization comes from the API key. Supported uploads: PDF, DOCX, and DOC, up to **40MB**.
+
+### 2. Get a fresh editor URL
+
+When the create URL has expired, or whenever a user needs to edit again:
+
+```bash
+curl --request POST \
+  --url https://api.formabledocs.com/api/v0/templates/abc123xyz/edit-url \
+  --header "Authorization: Bearer $TOKEN"
+```
+
+```json Response
+{
+  "editUrl": "https://app.formabledocs.com/template-setup/abc123xyz",
+  "expiresAt": "2024-01-16T10:30:00.000Z"
+}
+```
+
+This replaces Acrobat Sign's library `EDIT` view (or agreement authoring view) call. Generate just-in-time on your backend. Unknown IDs return `404`; templates outside your organization return `403`.
+
+### 3. Embed on the client
+
+```html
+<iframe
+  src="https://app.formabledocs.com/template-setup/abc123xyz"
+  width="100%"
+  height="800"
+  allow="fullscreen"
+  style="border: none;"
+></iframe>
+```
+
+Pass only the `editUrl` to the browser — never the API key. Template editing uses the same iframe pattern as [embedded signing](/migrations/adobe-acrobat-sign/embedded-signing). Listen for `onTemplateEditorSaved` when the user finishes editing — see [Embedded templates](/walkthroughs/embedded-templates#listen-for-editor-events).
+
+## Form field → field mapping
+
+| Adobe Acrobat Sign (typical) | Formable field |
+| --- | --- |
+| Signature / signature block | Signature |
+| Text / full name / company | Text |
+| Date / date signed | Date |
+| Checkbox | Checkbox |
+| Numerical / amount-style | Amount |
+
+If you previously set `mergeFieldInfo` when creating an agreement, use Formable `fields: [{ fieldId, value }]` at [signature request](/migrations/adobe-acrobat-sign/embedded-signing) time instead. Field IDs come from the editor after placement — see [prefills](/walkthroughs/embedded-signing#prefill-fields).
+
+## Differences to plan for
+
+<AccordionGroup>
+  <Accordion title="One upload instead of transient + library">
+    Acrobat Sign separates transient upload from library document create. Formable returns a usable `templateId` and `editUrl` from a single multipart create.
+  </Accordion>
+  <Accordion title="Visual editor instead of formFieldGenerators">
+    Anchor text generators and coordinate payloads don't carry over as the primary path. Place fields in Formable's editor and reference `fieldId`s for prefills.
+  </Accordion>
+  <Accordion title="Prepare once, not AUTHORING per send">
+    Some Acrobat Sign flows author fields on each agreement. Formable templates hold fields; you pass `signers` when creating the signature request.
+  </Accordion>
+  <Accordion title="API key instead of OAuth">
+    Template create and edit-url calls use the same Bearer API key as signing — no regional OAuth token or `x-api-user`.
+  </Accordion>
+  <Accordion title="Rebuild prefill keys">
+    Acrobat Sign form / merge field names won't match Formable `fieldId`s. After users place fields, store the new IDs and update your send payload.
+  </Accordion>
+</AccordionGroup>
+
+## Checklist
+
+<Steps>
+  <Step title="Create a Formable API key">
+    In [Settings](https://app.formabledocs.com/settings).
+  </Step>
+  <Step title="Re-upload each library document">
+    Call [`POST /v0/templates`](/api-reference/endpoint/create-template).
+  </Step>
+  <Step title="Replace authoring / EDIT views">
+    Embed `editUrl` from create or [`POST .../edit-url`](/api-reference/endpoint/create-template-edit-url).
+  </Step>
+  <Step title="Map form field names to fieldIds">
+    Place fields in the editor and update prefill code.
+  </Step>
+  <Step title="Send with the new templateId">
+    Continue with [embedded signing migration](/migrations/adobe-acrobat-sign/embedded-signing).
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Embedded signing migration" icon="signature" href="/migrations/adobe-acrobat-sign/embedded-signing">
+    Map agreements and signing URLs to Formable.
+  </Card>
+  <Card title="Embedded templates walkthrough" icon="file-lines" href="/walkthroughs/embedded-templates">
+    Full Formable template editor walkthrough.
+  </Card>
+  <Card title="Core concepts" icon="book" href="/concepts">
+    How templates and signature requests fit together.
+  </Card>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Bearer `fmbl_` API keys.
+  </Card>
+</CardGroup>
