@@ -43,7 +43,7 @@
                 ]
               },
               {
-                "group": "DocuSign",
+                "group": "Docusign",
                 "pages": [
                   "migrations/docusign/embedded-templates",
                   "migrations/docusign/embedded-signing"

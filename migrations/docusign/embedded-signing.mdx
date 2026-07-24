@@ -1,24 +1,24 @@
 ---
-title: "DocuSign → Embedded signing"
-description: "Migrate DocuSign embedded signing (envelopes, recipient views) to the Formable API."
+title: "Docusign → Embedded signing"
+description: "Migrate Docusign embedded signing (envelopes, recipient views) to the Formable API."
 sidebarTitle: "Embedded signing"
 ---
 
-This guide helps you move a DocuSign embedded signing integration to Formable. You still create a send, mint a recipient signing URL, embed it, and download the completed PDF. You drop OAuth account paths, `clientUserId`, and `returnUrl` redirects in favor of Bearer API keys, a simpler create payload, and webhook- or poll-driven completion.
+This guide helps you move a Docusign embedded signing integration to Formable. You still create a send, mint a recipient signing URL, embed it, and download the completed PDF. You drop OAuth account paths, `clientUserId`, and `returnUrl` redirects in favor of Bearer API keys, a simpler create payload, and webhook- or poll-driven completion.
 
-If you also prepare templates inside your product, migrate that first with [DocuSign → Embedded templates](/migrations/docusign/embedded-templates). Formable signing always starts from a prepared template.
+If you also prepare templates inside your product, migrate that first with [Docusign → Embedded templates](/migrations/docusign/embedded-templates). Formable signing always starts from a prepared template.
 
 <Info>
-  New to Formable? Complete the [Embedded signing walkthrough](/walkthroughs/embedded-signing) first, then use this page as a translation layer from DocuSign envelopes and recipient views.
+  New to Formable? Complete the [Embedded signing walkthrough](/walkthroughs/embedded-signing) first, then use this page as a translation layer from Docusign envelopes and recipient views.
 </Info>
 
 <Tip>
-  Prefer a white-glove migration? Email [matt@formabledocs.com](mailto:matt@formabledocs.com) and we'll handle moving your DocuSign integration to the Formable API.
+  Prefer a white-glove migration? Email [matt@formabledocs.com](mailto:matt@formabledocs.com) and we'll handle moving your Docusign integration to the Formable API.
 </Tip>
 
 ## What you're moving
 
-In DocuSign you typically:
+In Docusign you typically:
 
 1. Authenticate with OAuth and call account-scoped REST paths
 2. Create an envelope with a recipient that has a `clientUserId` (embedded / captive signer)
@@ -58,7 +58,7 @@ The product journey stays the same: prepare a document, send it, embed signing, 
 
 ## What's similar
 
-Several DocuSign ideas transfer directly:
+Several Docusign ideas transfer directly:
 
 - A reusable **template** still backs many sends.
 - You still create a send unit (envelope → **signature request**), then open a short-lived URL for the signer.
@@ -66,13 +66,13 @@ Several DocuSign ideas transfer directly:
 - Demo / non-billing traffic maps to `testMode: true` (instead of relying only on a demo account). Test mode documents are watermarked and are not legally binding.
 - After completion you still fetch a combined signed PDF.
 
-If your DocuSign flow is "create envelope from template → create recipient view → iframe → Connect → download," you are remapping objects and removing embedded-signer bookkeeping, not redesigning the user journey.
+If your Docusign flow is "create envelope from template → create recipient view → iframe → Connect → download," you are remapping objects and removing embedded-signer bookkeeping, not redesigning the user journey.
 
 ## What's different
 
-These DocuSign-specific pieces do not carry over:
+These Docusign-specific pieces do not carry over:
 
-| Area | DocuSign | Formable |
+| Area | Docusign | Formable |
 | --- | --- | --- |
 | Auth | OAuth access token + `/accounts/{accountId}/...` | Bearer `fmbl_…`; no `accountId` in the path |
 | Embedded marker | Recipient `clientUserId` | Embedded by default once you mint a `signingUrl` |
@@ -86,20 +86,20 @@ You no longer maintain a parallel "captive signer" identity. Create the request 
 
 ## Concept map
 
-| DocuSign | Formable | Notes |
+| Docusign | Formable | Notes |
 | --- | --- | --- |
 | OAuth access token | API key (`Authorization: Bearer fmbl_…`) | No JWT / Auth Code for the standard integration. |
 | Account (`accountId`) | Organization | Implied by the API key. |
 | Envelope | Signature request | Formable's send unit. |
 | Recipient + `clientUserId` | Signer (`email` + `name`) | Embedded by default — no `clientUserId`. |
-| Recipient view URL | `signingUrl` | Expires after **1 hour** (DocuSign ~5 minutes). |
+| Recipient view URL | `signingUrl` | Expires after **1 hour** (Docusign ~5 minutes). |
 | `returnUrl` | `onSigningComplete` `postMessage` | Close the iframe from the client event; confirm via webhooks or polling. |
 | Connect / `eventNotification` | Webhooks | Org-level URL + `Content-Sha256`. |
 | Envelope `completed` | `document_signed` / status `Completed` | Then fetch the signed PDF. |
 
 ## Endpoint map
 
-| DocuSign | Formable |
+| Docusign | Formable |
 | --- | --- |
 | `POST /v2.1/accounts/{accountId}/envelopes` | [`POST /v0/signature-requests`](/api-reference/endpoint/create-signature-request) |
 | `POST .../envelopes/{envelopeId}/views/recipient` | [`POST /v0/signature-requests/{id}/url`](/api-reference/endpoint/create-signing-url) |
@@ -108,7 +108,7 @@ You no longer maintain a parallel "captive signer" identity. Create the request 
 
 ## Auth
 
-DocuSign:
+Docusign:
 
 ```bash
 Authorization: Bearer {access_token}
@@ -129,7 +129,7 @@ No `accountId` in the path. Create the key in [Settings](https://app.formabledoc
 
 ### 1. Create the signature request (was: create envelope)
 
-**DocuSign** (simplified):
+**Docusign** (simplified):
 
 ```json
 {
@@ -175,9 +175,9 @@ curl --request POST \
 { "signatureRequestId": "sr_456def" }
 ```
 
-Prefer the `signers` array. Map tab / merge values to `fields` using Formable `fieldId`s from the template editor (not DocuSign `tabLabel`s).
+Prefer the `signers` array. Map tab / merge values to `fields` using Formable `fieldId`s from the template editor (not Docusign `tabLabel`s).
 
-| DocuSign | Formable |
+| Docusign | Formable |
 | --- | --- |
 | `templateId` | `templateId` |
 | `templateRoles[].email` / `name` | `signers[].email` / `name` |
@@ -189,7 +189,7 @@ Prefer the `signers` array. Map tab / merge values to `fields` using Formable `f
 
 ### 2. Create the signing URL (was: recipient view)
 
-**DocuSign:**
+**Docusign:**
 
 ```bash
 POST /v2.1/accounts/{accountId}/envelopes/{envelopeId}/views/recipient
@@ -245,7 +245,7 @@ window.addEventListener("message", (event) => {
 });
 ```
 
-Use `onSigningComplete` instead of a DocuSign `returnUrl` redirect for client UX. Confirm completion with [`document_signed`](/webhooks/events#document_signed) or by polling `status` until `Completed` before downloading. See [Embedded signing](/walkthroughs/embedded-signing#detect-completion).
+Use `onSigningComplete` instead of a Docusign `returnUrl` redirect for client UX. Confirm completion with [`document_signed`](/webhooks/events#document_signed) or by polling `status` until `Completed` before downloading. See [Embedded signing](/walkthroughs/embedded-signing#detect-completion).
 
 ### 4. Download the signed PDF
 
@@ -276,7 +276,7 @@ Webhook verification uses `Content-Sha256` instead of `X-DocuSign-Signature-1`. 
     Listen for `onSigningComplete` to update the client immediately. Confirm with a webhook or poll before downloading, then build any "signing finished" screen in your own app.
   </Accordion>
   <Accordion title="Longer-lived signing URLs">
-    Plan refresh logic around a **1 hour** TTL instead of DocuSign's shorter recipient-view window. Still mint just in time; don't store URLs for later sessions.
+    Plan refresh logic around a **1 hour** TTL instead of Docusign's shorter recipient-view window. Still mint just in time; don't store URLs for later sessions.
   </Accordion>
 </AccordionGroup>
 
@@ -304,7 +304,7 @@ Webhook verification uses `Content-Sha256` instead of `X-DocuSign-Signature-1`. 
 
 <CardGroup cols={2}>
   <Card title="Embedded templates migration" icon="file-lines" href="/migrations/docusign/embedded-templates">
-    Map DocuSign template edit views to Formable.
+    Map Docusign template edit views to Formable.
   </Card>
   <Card title="Embedded signing walkthrough" icon="window-maximize" href="/walkthroughs/embedded-signing">
     Full Formable signing walkthrough.
