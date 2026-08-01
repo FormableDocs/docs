@@ -33,6 +33,13 @@
             ]
           },
           {
+            "group": "SDKs",
+            "pages": [
+              "sdks/overview",
+              "sdks/node"
+            ]
+          },
+          {
             "group": "Migrations",
             "pages": [
               {
