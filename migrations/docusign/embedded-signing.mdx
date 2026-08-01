@@ -29,10 +29,10 @@ In Docusign you typically:
 In Formable you:
 
 1. Authenticate with a Bearer API key (`fmbl_…`)
-2. Create a **signature request** from a `templateId` with `signers` and `sender`
-3. Mint a `signingUrl` (no `clientUserId`, no `returnUrl`)
+2. Create an **embedded signature request** from a `templateId` with a `signers` array (each with `email`, `name`, and `role`)
+3. Mint a `signingUrl` from each signer's `recipientSignatureId` (no `clientUserId`, no `returnUrl`)
 4. Load it in a plain iframe (URL lasts **1 hour**)
-5. Handle [`document_signed`](/webhooks/events#document_signed) or poll `status`, then download the signed envelope
+5. Handle [`document_completed`](/webhooks/events#document_completed) or poll `status`, then download the signed envelope
 
 The product journey stays the same: prepare a document, send it, embed signing, react when done. The API surface is smaller and organization-scoped by the key rather than by `accountId` in the path.
 
@@ -76,11 +76,11 @@ These Docusign-specific pieces do not carry over:
 | --- | --- | --- |
 | Auth | OAuth access token + `/accounts/{accountId}/...` | Bearer `fmbl_…`; no `accountId` in the path |
 | Embedded marker | Recipient `clientUserId` | Embedded by default once you mint a `signingUrl` |
-| View request | Match email / userName / `clientUserId`; require `returnUrl` | POST create URL with only the `signatureRequestId` |
+| View request | Match email / userName / `clientUserId`; require `returnUrl` | POST create URL with the signer's `recipientSignatureId` |
 | Completion UX | Often `returnUrl` redirect with an `event` query param | `onSigningComplete` iframe message for UI; confirm with webhooks or polling |
 | View TTL | Commonly ~5 minutes | **1 hour** |
 | Webhooks | Connect / `eventNotification`, `X-DocuSign-Signature-1` | Org-level URL, `Content-Sha256` |
-| Roles | `templateRoles` / `roleName` | `signers` array order; roles aren't named on create |
+| Roles | `templateRoles` / `roleName` | `signers[].role` (match template field roles) |
 
 You no longer maintain a parallel "captive signer" identity. Create the request when you're ready to send, mint the URL when the user is ready to sign, and listen for completion out of band.
 
@@ -91,19 +91,19 @@ You no longer maintain a parallel "captive signer" identity. Create the request 
 | OAuth access token | API key (`Authorization: Bearer fmbl_…`) | No JWT / Auth Code for the standard integration. |
 | Account (`accountId`) | Organization | Implied by the API key. |
 | Envelope | Signature request | Formable's send unit. |
-| Recipient + `clientUserId` | Signer (`email` + `name`) | Embedded by default — no `clientUserId`. |
+| Recipient + `clientUserId` | `signers[]` with `email`, `name`, and `role` | Embedded by default — no `clientUserId`. Save each `recipientSignatureId`. |
 | Recipient view URL | `signingUrl` | Expires after **1 hour** (Docusign ~5 minutes). |
 | `returnUrl` | `onSigningComplete` `postMessage` | Close the iframe from the client event; confirm via webhooks or polling. |
 | Connect / `eventNotification` | Webhooks | Org-level URL + `Content-Sha256`. |
-| Envelope `completed` | `document_signed` / status `Completed` | Then fetch the signed PDF. |
+| Envelope `completed` | `document_completed` / status `Completed` | Then fetch the signed PDF. |
 
 ## Endpoint map
 
 | Docusign | Formable |
 | --- | --- |
-| `POST /v2.1/accounts/{accountId}/envelopes` | [`POST /v0/signature-requests`](/api-reference/endpoint/create-signature-request) |
-| `POST .../envelopes/{envelopeId}/views/recipient` | [`POST /v0/signature-requests/{id}/url`](/api-reference/endpoint/create-signing-url) |
-| Get document / combined PDF | [`GET /v0/signature-requests/{id}/signed-envelope`](/api-reference/endpoint/get-signed-envelope) |
+| `POST /v2.1/accounts/{accountId}/envelopes` | [`POST /v1/signature-requests/embedded`](/api-reference/endpoint/create-signature-request) |
+| `POST .../envelopes/{envelopeId}/views/recipient` | [`POST /v1/recipient-signatures/{id}/url`](/api-reference/endpoint/create-signing-url) |
+| Get document / combined PDF | [`GET /v1/signature-requests/{id}/signed-envelope`](/api-reference/endpoint/get-signed-envelope) |
 | Connect / `eventNotification` | Webhook URL in [Settings](https://app.formabledocs.com/settings) |
 
 ## Auth
@@ -119,7 +119,7 @@ against `/restapi/v2.1/accounts/{accountId}/...`.
 Formable:
 
 ```bash
-curl https://api.formabledocs.com/api/v0/signature-requests \
+curl https://api.formabledocs.com/v1/signature-requests \
   --header "Authorization: Bearer fmbl_YOUR_API_KEY"
 ```
 
@@ -155,13 +155,13 @@ No `accountId` in the path. Create the key in [Settings](https://app.formabledoc
 
 ```bash
 curl --request POST \
-  --url https://api.formabledocs.com/api/v0/signature-requests \
+  --url https://api.formabledocs.com/v1/signature-requests/embedded \
   --header "Authorization: Bearer $TOKEN" \
   --header 'Content-Type: application/json' \
   --data '{
     "templateId": "abc123xyz",
     "signers": [
-      { "email": "jane@example.com", "name": "Jane Doe" }
+      { "email": "jane@example.com", "name": "Jane Doe", "role": "Signer" }
     ],
     "sender": { "email": "you@yourcompany.com", "name": "Your Company" },
     "fields": [
@@ -172,16 +172,25 @@ curl --request POST \
 ```
 
 ```json Response
-{ "signatureRequestId": "sr_456def" }
+{
+  "signatureRequestId": "sr_456def",
+  "signers": [
+    {
+      "email": "jane@example.com",
+      "name": "Jane Doe",
+      "recipientSignatureId": "rsig_789ghi"
+    }
+  ]
+}
 ```
 
-Prefer the `signers` array. Map tab / merge values to `fields` using Formable `fieldId`s from the template editor (not Docusign `tabLabel`s).
+Pass a `signers` array on every create. Each signer needs `email`, `name`, and `role`. `sender` is optional and defaults to the org owner. Map tab / merge values to `fields` using Formable `fieldId`s from the template editor (not Docusign `tabLabel`s). Save each signer's `recipientSignatureId` to mint their signing URL.
 
 | Docusign | Formable |
 | --- | --- |
 | `templateId` | `templateId` |
 | `templateRoles[].email` / `name` | `signers[].email` / `name` |
-| `roleName` | Not used — order is the `signers` array |
+| `roleName` | `signers[].role` |
 | `clientUserId` | Omit |
 | Tab values on the role | `fields: [{ fieldId, value }]` |
 | `status: "sent"` | Create, then mint the URL when ready |
@@ -209,7 +218,7 @@ POST /v2.1/accounts/{accountId}/envelopes/{envelopeId}/views/recipient
 
 ```bash
 curl --request POST \
-  --url https://api.formabledocs.com/api/v0/signature-requests/sr_456def/url \
+  --url https://api.formabledocs.com/v1/recipient-signatures/rsig_789ghi/url \
   --header "Authorization: Bearer $TOKEN"
 ```
 
@@ -220,7 +229,7 @@ curl --request POST \
 }
 ```
 
-No `clientUserId`, `returnUrl`, or `authenticationMethod`. You do not re-send the signer's email and name on the URL call. Formable URLs last **1 hour**. Creating a URL for an already completed request returns `409`.
+No `clientUserId`, `returnUrl`, or `authenticationMethod`. You do not re-send the signer's email and name on the URL call — pass their `recipientSignatureId` from the create response. Formable URLs last **1 hour**. Creating a URL for an already completed request returns `409`.
 
 ### 3. Embed on the client
 
@@ -245,13 +254,13 @@ window.addEventListener("message", (event) => {
 });
 ```
 
-Use `onSigningComplete` instead of a Docusign `returnUrl` redirect for client UX. Confirm completion with [`document_signed`](/webhooks/events#document_signed) or by polling `status` until `Completed` before downloading. See [Embedded signing](/walkthroughs/embedded-signing#detect-completion).
+Use `onSigningComplete` instead of a Docusign `returnUrl` redirect for client UX. Confirm completion with [`document_completed`](/webhooks/events#document_completed) or by polling `status` until `Completed` before downloading. See [Embedded signing](/walkthroughs/embedded-signing#detect-completion).
 
 ### 4. Download the signed PDF
 
 ```bash
 curl --request GET \
-  --url https://api.formabledocs.com/api/v0/signature-requests/sr_456def/signed-envelope \
+  --url https://api.formabledocs.com/v1/signature-requests/sr_456def/signed-envelope \
   --header "Authorization: Bearer $TOKEN"
 ```
 
@@ -290,13 +299,13 @@ Webhook verification uses `Content-Sha256` instead of `X-DocuSign-Signature-1`. 
     Or migrate the [embedded template flow](/migrations/docusign/embedded-templates) separately.
   </Step>
   <Step title="Replace Envelopes:create">
-    Use create signature request with `signers`, `sender`, and optional `fields`. Prefer `signers` over a single `signer`.
+    Use create embedded signature request with `signers` (including `role`), optional `sender`, and optional `fields`.
   </Step>
   <Step title="Replace createRecipientView">
-    Call create signing URL; drop `clientUserId` / `returnUrl`.
+    Call create signing URL with each signer's `recipientSignatureId`; drop `clientUserId`, `returnUrl`, and `authenticationMethod`.
   </Step>
   <Step title="Swap Connect for Formable webhooks">
-    Handle `document_signed` and download the signed envelope.
+    Handle `document_completed` and download the signed envelope.
   </Step>
 </Steps>
 

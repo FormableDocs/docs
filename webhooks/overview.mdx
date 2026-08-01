@@ -29,7 +29,7 @@ The request body **is** the event object — it is not wrapped in an envelope. E
   "event": {
     "event_id": "p-1phZC6_oU8qS191gsLT",
     "event_category": "signing",
-    "event_type": "document_signed",
+    "event_type": "document_completed",
     "event_time": 1777039156023
   },
   "signing": {
@@ -40,7 +40,7 @@ The request body **is** the event object — it is not wrapped in an envelope. E
 
 - `event.event_id` — a unique ID for this delivery. Use it for [idempotency](#idempotency).
 - `event.event_category` — `signing` or `redlining`.
-- `event.event_type` — the specific event, for example `document_signed`. See the [event catalog](/webhooks/events).
+- `event.event_type` — the specific event, for example `document_completed`. See the [event catalog](/webhooks/events).
 - `event.event_time` — when the event occurred, in **milliseconds** since the Unix epoch.
 - A category-specific object (`signing` or `redlining`) carries the event details.
 
@@ -61,7 +61,7 @@ Register your webhook URL in [Settings](https://app.formabledocs.com/settings) a
 </Steps>
 
 <Note>
-  Each organization has **one** webhook URL. For e-signing, handle `document_viewed` and `document_signed`. The same endpoint also receives redlining events if you use that workflow — inspect `event.event_type` to decide what to act on.
+  Each organization has **one** webhook URL. For e-signing, handle `document_viewed`, `document_signed`, and `document_completed`. Wait for `document_completed` before downloading the signed PDF. The same endpoint also receives redlining events if you use that workflow — inspect `event.event_type` to decide what to act on.
 </Note>
 
 ## Manage your endpoint

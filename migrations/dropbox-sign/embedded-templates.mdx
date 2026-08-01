@@ -27,7 +27,7 @@ In Dropbox Sign you typically:
 
 In Formable you:
 
-1. `POST /v0/templates` with the file (`file` + `filename`)
+1. `POST /v1/templates` with the file (`file` + `filename`)
 2. Embed `editUrl` from the create response (or regenerate later)
 3. Let the user place Signature / Text / Date / Checkbox / Amount fields in the Formable editor
 4. Reuse `templateId` on every [signature request](/migrations/dropbox-sign/embedded-signing)
@@ -41,7 +41,7 @@ As you can see, very similar flows. You are migrating the "prepare the document 
     Create an organization and key in [Settings](https://app.formabledocs.com/settings). See [Authentication](/authentication).
   </Step>
   <Step title="Replace create_embedded_draft">
-    Call [`POST /v0/templates`](/api-reference/endpoint/create-template) with the PDF or Word file.
+    Call [`POST /v1/templates`](/api-reference/endpoint/create-template) with the PDF or Word file.
   </Step>
   <Step title="Replace embedded/edit_url">
     Use `editTemplateAccess.editUrl` from create, or [`POST .../edit-url`](/api-reference/endpoint/create-template-edit-url) when it expires.
@@ -70,10 +70,10 @@ If you already treat "create draft → open edit URL → wait for user → send 
 | Area | Dropbox Sign | Formable |
 | --- | --- | --- |
 | Auth | API key | API key |
-| Create payload | Files, `signer_roles`, title, `client_id` | Multipart `file` + `filename` only |
+| Create payload | Files, `signer_roles`, title, `client_id` | Multipart `file` + `filename`; optional `signer_roles` JSON string |
 | Draft vs ready | Embedded draft is finalized after the editor flow | `templateId` is returned immediately; users still must place fields before signing works end to end |
 | Client embed | `hellosign-embedded` + `createTemplate` event | Plain iframe + `window.postMessage` (`onTemplateEditorSaved`) |
-| Roles | Declared as `signer_roles` on create | Defined by field placement in the editor; signers are passed at send time |
+| Roles | Declared as `signer_roles` on create | Optional `signer_roles` on create; assign roles to fields in the editor; pass matching `signers[].role` at send time |
 
 Replace Dropbox Sign's `createTemplate` client event with Formable's `onTemplateEditorSaved` iframe `postMessage`. There is no Formable JS SDK — listen on `window` instead.
 
@@ -86,14 +86,14 @@ Replace Dropbox Sign's `createTemplate` client event with Formable's `onTemplate
 | `edit_url` | `editUrl` | Embed in an iframe. Expires (default **1 day**). |
 | `client_id` on draft / open | Organization | Implied by the API key. |
 | `hellosign-embedded` + `open(editUrl)` | Plain `<iframe>` + `postMessage` | Listen for `onTemplateEditorSaved`. No Formable JS SDK. |
-| Signer roles on the draft | Fields in the editor | Place Signature / Text / Date / etc. visually. |
+| Signer roles on the draft | `signer_roles` on create (optional) + field placement in the editor | Pass matching `signers[].role` when creating a signature request. |
 
 ## Endpoint map
 
 | Dropbox Sign | Formable |
 | --- | --- |
-| `POST /v3/template/create_embedded_draft` | [`POST /v0/templates`](/api-reference/endpoint/create-template) |
-| `GET /v3/embedded/edit_url/{template_id}` | [`POST /v0/templates/{templateId}/edit-url`](/api-reference/endpoint/create-template-edit-url) |
+| `POST /v3/template/create_embedded_draft` | [`POST /v1/templates`](/api-reference/endpoint/create-template) |
+| `GET /v3/embedded/edit_url/{template_id}` | [`POST /v1/templates/{templateId}/edit-url`](/api-reference/endpoint/create-template-edit-url) |
 | `edit_url` returned on draft create | `editTemplateAccess.editUrl` on create |
 
 ## Auth
@@ -101,7 +101,7 @@ Replace Dropbox Sign's `createTemplate` client event with Formable's `onTemplate
 Dropbox Sign draft create uses HTTP Basic and a `client_id`. Formable uses the same Bearer key as signing:
 
 ```bash
-curl https://api.formabledocs.com/api/v0/templates \
+curl https://api.formabledocs.com/v1/templates \
   --header "Authorization: Bearer fmbl_YOUR_API_KEY" \
   --form 'file=@./nda.pdf' \
   --form 'filename=nda.pdf'
@@ -129,10 +129,11 @@ curl https://api.hellosign.com/v3/template/create_embedded_draft \
 
 ```bash
 curl --request POST \
-  --url https://api.formabledocs.com/api/v0/templates \
+  --url https://api.formabledocs.com/v1/templates \
   --header "Authorization: Bearer $TOKEN" \
   --form 'file=@./nda.pdf' \
-  --form 'filename=nda.pdf'
+  --form 'filename=nda.pdf' \
+  --form 'signer_roles=[{"name":"Client","order":0}]'
 ```
 
 ```json Response
@@ -151,7 +152,7 @@ Supported uploads: PDF, DOCX, and DOC, up to **40MB**. Save `templateId` for lat
 | --- | --- |
 | `file` / `file_url` | `file` + `filename` (multipart) |
 | `client_id` | Omit |
-| `signer_roles` | Place roles/fields in the editor UI |
+| `signer_roles` | Optional `signer_roles` (JSON string in multipart); assign roles to required fields in the editor |
 | `title` / metadata | Not required on create |
 | Draft `edit_url` | `editTemplateAccess.editUrl` |
 
@@ -168,7 +169,7 @@ curl https://api.hellosign.com/v3/embedded/edit_url/TEMPLATE_ID \
 
 ```bash
 curl --request POST \
-  --url https://api.formabledocs.com/api/v0/templates/abc123xyz/edit-url \
+  --url https://api.formabledocs.com/v1/templates/abc123xyz/edit-url \
   --header "Authorization: Bearer $TOKEN"
 ```
 
@@ -244,8 +245,8 @@ After placement, copy each field's `id` for [prefills](/walkthroughs/embedded-si
   <Accordion title="No hellosign-embedded — use iframe postMessage">
     Use an iframe. Listen for `onTemplateEditorSaved` instead of the Dropbox Sign `createTemplate` client event.
   </Accordion>
-  <Accordion title="No signer_roles on create">
-    Define who signs and where fields go in the visual editor, not as role arrays on the create call. Pass `signers` when you [create the signature request](/migrations/dropbox-sign/embedded-signing).
+  <Accordion title="Optional signer_roles on create">
+    You can pass `signer_roles` as a JSON string when uploading, similar to Dropbox Sign. You still assign those roles to required fields in the editor, then pass matching `signers[].role` values when you [create the embedded signature request](/migrations/dropbox-sign/embedded-signing).
   </Accordion>
   <Accordion title="Same embedding pattern as signing">
     Template `editUrl` and signing `signingUrl` both come from your backend and load in an iframe. You do not need two different Dropbox Sign-style client libraries.
@@ -259,7 +260,7 @@ After placement, copy each field's `id` for [prefills](/walkthroughs/embedded-si
     In [Settings](https://app.formabledocs.com/settings).
   </Step>
   <Step title="Replace create_embedded_draft">
-    Call [`POST /v0/templates`](/api-reference/endpoint/create-template) with the file.
+    Call [`POST /v1/templates`](/api-reference/endpoint/create-template) with the file.
   </Step>
   <Step title="Replace embedded/edit_url">
     Use the create response `editUrl`, or [`POST .../edit-url`](/api-reference/endpoint/create-template-edit-url).

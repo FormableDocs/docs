@@ -27,7 +27,7 @@ In Docusign apps you typically:
 
 In Formable you:
 
-1. `POST /v0/templates` with the file
+1. `POST /v1/templates` with the file
 2. Embed `editUrl` so users place fields in your product
 3. Copy each field's `id` for later prefills
 4. Create signature requests with that `templateId` and a `signers` array
@@ -41,7 +41,7 @@ You are migrating document preparation and in-product editing. Envelope send and
     Create an organization and key in [Settings](https://app.formabledocs.com/settings). See [Authentication](/authentication).
   </Step>
   <Step title="Re-upload each template document">
-    Call [`POST /v0/templates`](/api-reference/endpoint/create-template) with PDF or Word files (max 40MB).
+    Call [`POST /v1/templates`](/api-reference/endpoint/create-template) with PDF or Word files (max 40MB).
   </Step>
   <Step title="Replace template edit views">
     Embed `editUrl` from create, or [`POST .../edit-url`](/api-reference/endpoint/create-template-edit-url) when it expires.
@@ -72,7 +72,7 @@ Plan for these Docusign-specific patterns that do not map 1:1:
 | Area | Docusign | Formable |
 | --- | --- | --- |
 | Auth | OAuth + account-scoped template APIs | Bearer `fmbl_…`; organization from the key |
-| Roles on create | Template roles defined up front | Fields in the editor; `signers` at send time |
+| Roles on create | Template roles defined up front | Optional `signer_roles` on create; assign roles to fields in the editor; pass `signers[].role` at send time |
 | Tab placement | Coordinates, Anchor / AutoPlace strings, or UI | Visual placement in Formable's editor |
 | Prefill keys | `tabLabel` / tab groups on roles | `fieldId` from the Formable editor |
 | Edit view | Template edit view API with account path | `editTemplateAccess.editUrl` or `POST .../edit-url` |
@@ -88,14 +88,14 @@ Anchor strings and absolute coordinates in create-envelope payloads do not carry
 | Tabs (SignHere, Text, DateSigned, …) | Fields (Signature, Text, Date, …) | Placed in Formable's visual editor. |
 | Template edit view URL | `editUrl` | Embed in an iframe. Expires (default **1 day**). |
 | Anchor / AutoPlace tabs | Visual placement in the editor | Recreate positions in the UI; prefill by `fieldId`. |
-| Template roles | Signers at send time | Roles aren't declared on template create. |
+| Template roles | Optional `signer_roles` on create + field placement in the editor | Pass matching `signers[].role` at send time. |
 
 ## Endpoint map
 
 | Docusign | Formable |
 | --- | --- |
-| Create template / upload documents | [`POST /v0/templates`](/api-reference/endpoint/create-template) |
-| Template edit view (e.g. `TemplateViews:createEdit`) | [`POST /v0/templates/{templateId}/edit-url`](/api-reference/endpoint/create-template-edit-url) |
+| Create template / upload documents | [`POST /v1/templates`](/api-reference/endpoint/create-template) |
+| Template edit view (e.g. `TemplateViews:createEdit`) | [`POST /v1/templates/{templateId}/edit-url`](/api-reference/endpoint/create-template-edit-url) |
 | `editUrl` on create | `editTemplateAccess.editUrl` returned from create |
 
 ## Auth
@@ -103,7 +103,7 @@ Anchor strings and absolute coordinates in create-envelope payloads do not carry
 Docusign template APIs sit under `/v2.1/accounts/{accountId}/...` with an OAuth token. Formable uses the same Bearer key as signing:
 
 ```bash
-curl https://api.formabledocs.com/api/v0/templates \
+curl https://api.formabledocs.com/v1/templates \
   --header "Authorization: Bearer fmbl_YOUR_API_KEY" \
   --form 'file=@./agreement.pdf' \
   --form 'filename=agreement.pdf'
@@ -117,10 +117,11 @@ See [Authentication](/authentication). Call these endpoints from your backend on
 
 ```bash
 curl --request POST \
-  --url https://api.formabledocs.com/api/v0/templates \
+  --url https://api.formabledocs.com/v1/templates \
   --header "Authorization: Bearer $TOKEN" \
   --form 'file=@./agreement.pdf' \
-  --form 'filename=agreement.pdf'
+  --form 'filename=agreement.pdf' \
+  --form 'signer_roles=[{"name":"Signer","order":0}]'
 ```
 
 ```json Response
@@ -133,7 +134,7 @@ curl --request POST \
 }
 ```
 
-There is no separate OAuth account path. The organization comes from the API key. Supported uploads: PDF, DOCX, and DOC, up to **40MB**.
+There is no separate OAuth account path. The organization comes from the API key. Supported uploads: PDF, DOCX, and DOC, up to **40MB**. `signer_roles` is optional — pass it as a JSON string in multipart form data when you want named roles before opening the editor. You still assign those roles to required fields in the editor.
 
 ### 2. Get a fresh editor URL
 
@@ -141,7 +142,7 @@ When the create URL has expired, or whenever a user needs to edit again:
 
 ```bash
 curl --request POST \
-  --url https://api.formabledocs.com/api/v0/templates/abc123xyz/edit-url \
+  --url https://api.formabledocs.com/v1/templates/abc123xyz/edit-url \
   --header "Authorization: Bearer $TOKEN"
 ```
 
@@ -186,8 +187,8 @@ If you previously set tab values on `templateRoles` when creating an envelope, u
   <Accordion title="Visual editor instead of Anchor tabs">
     Anchor strings and absolute coordinates in the create-envelope payload don't carry over. Place fields in Formable's editor and reference `fieldId`s for prefills.
   </Accordion>
-  <Accordion title="No roles on template create">
-    Docusign templates often define roles up front. Formable templates hold fields; you pass `signers` when creating the signature request.
+  <Accordion title="Optional roles on template create">
+    Docusign templates often define roles up front. Formable supports optional `signer_roles` on template create, but you still assign roles to required fields in the editor and pass matching `signers[].role` when creating the signature request.
   </Accordion>
   <Accordion title="API key instead of OAuth">
     Template create and edit-url calls use the same Bearer API key as signing — no account-scoped OAuth token.
@@ -204,7 +205,7 @@ If you previously set tab values on `templateRoles` when creating an envelope, u
     In [Settings](https://app.formabledocs.com/settings).
   </Step>
   <Step title="Re-upload each template document">
-    Call [`POST /v0/templates`](/api-reference/endpoint/create-template).
+    Call [`POST /v1/templates`](/api-reference/endpoint/create-template).
   </Step>
   <Step title="Replace template edit views">
     Embed `editUrl` from create or [`POST .../edit-url`](/api-reference/endpoint/create-template-edit-url).

@@ -3,31 +3,32 @@ title: "Embedded Signing Quickstart"
 description: "Create your first signature request and get an embeddable signing URL."
 ---
 
-This quickstart takes about **10 minutes**. In just **4 API calls**, you go from a plain PDF or DOCX to a signed document with an audit trail.
+This quickstart takes about **10 minutes**. In just **4 API calls**, you go from a plain PDF, DOC, or DOCX to a signed document with an audit trail.
 
 ## Prerequisites
 
 Before you begin, you need:
 
 - An **API key** from [Settings](https://app.formabledocs.com/settings) — see [Set up a developer account](/developer-account) and [Authentication](/authentication)
-- A **PDF or DOCX file** under 40MB to send for signature
+- A **PDF, DOC, or DOCX file** under 40MB to send for signature
 
 <Info>
-  The examples below use the production base URL `https://api.formabledocs.com/api`. Replace `$TOKEN` with your API key (it starts with `fmbl_`).
+  The examples below use the production base URL `https://api.formabledocs.com/v1`. Replace `$TOKEN` with your API key (it starts with `fmbl_`).
 </Info>
 
 ## Steps
 
 <Steps>
   <Step title="Upload a template">
-    Upload your document as `multipart/form-data`. Formable returns a `templateId` you'll use to send the document.
+    Upload your document as `multipart/form-data`. Formable returns a `templateId` you'll use to send the document. Optionally pass `signer_roles` so you can assign roles to fields in the editor.
 
     ```bash
     curl --request POST \
-      --url https://api.formabledocs.com/api/v0/templates \
+      --url https://api.formabledocs.com/v1/templates \
       --header "Authorization: Bearer $TOKEN" \
       --form 'file=@./agreement.pdf' \
-      --form 'filename=agreement.pdf'
+      --form 'filename=agreement.pdf' \
+      --form 'signer_roles=[{"name":"Client","order":0}]'
     ```
 
     ```json Response
@@ -41,7 +42,7 @@ Before you begin, you need:
     ```
 
     <Tip>
-      Open the `editUrl` in a browser to place signature, text, and date fields on the document. See [Embedded templates](/walkthroughs/embedded-templates).
+      Open the `editUrl` in a browser to place signature, text, and date fields on the document. Assign each required field a signer role (for example `Client`). See [Embedded templates](/walkthroughs/embedded-templates).
     </Tip>
 
     <Frame caption="Place a Signature field on the document, then click Save template.">
@@ -52,34 +53,50 @@ Before you begin, you need:
     </Frame>
   </Step>
 
-  <Step title="Create a signature request">
-    Create a signature request from the template. Provide the `signer` (who signs) and the `sender` (who's sending it).
+  <Step title="Create an embedded signature request">
+    Create a signature request from the template. Provide `signers` (who signs, with a `role` that matches required field roles on the template). `sender` is optional and defaults to the API key organization owner.
 
     ```bash
     curl --request POST \
-      --url https://api.formabledocs.com/api/v0/signature-requests \
+      --url https://api.formabledocs.com/v1/signature-requests/embedded \
       --header "Authorization: Bearer $TOKEN" \
       --header 'Content-Type: application/json' \
       --data '{
         "templateId": "abc123xyz",
-        "signer": { "email": "signer@example.com", "name": "Jane Doe" },
-        "sender": { "email": "you@yourcompany.com", "name": "Your Company" }
+        "signers": [
+          { "email": "signer@example.com", "name": "Jane Doe", "role": "Client" }
+        ],
+        "sender": { "email": "you@yourcompany.com", "name": "Your Company" },
+        "testMode": true
       }'
     ```
 
     ```json Response
     {
-      "signatureRequestId": "sr_456def"
+      "signatureRequestId": "sr_456def",
+      "templateId": "abc123xyz",
+      "signers": [
+        {
+          "email": "signer@example.com",
+          "name": "Jane Doe",
+          "recipientSignatureId": "rsig_789ghi"
+        }
+      ],
+      "sender": { "email": "you@yourcompany.com", "name": "Your Company" },
+      "status": "Created",
+      "testMode": true
     }
     ```
+
+    Save each signer's `recipientSignatureId`. You'll use it to mint that person's signing URL.
   </Step>
 
   <Step title="Generate a signing URL">
-    Turn the signature request into an embeddable signing URL. The URL expires one hour after creation.
+    Turn a recipient signature into an embeddable signing URL. The URL expires one hour after creation.
 
     ```bash
     curl --request POST \
-      --url https://api.formabledocs.com/api/v0/signature-requests/sr_456def/url \
+      --url https://api.formabledocs.com/v1/recipient-signatures/rsig_789ghi/url \
       --header "Authorization: Bearer $TOKEN"
     ```
 
@@ -109,7 +126,7 @@ Before you begin, you need:
 
     ```bash
     curl --request GET \
-      --url https://api.formabledocs.com/api/v0/signature-requests/sr_456def/signed-envelope \
+      --url https://api.formabledocs.com/v1/signature-requests/sr_456def/signed-envelope \
       --header "Authorization: Bearer $TOKEN"
     ```
 
@@ -120,7 +137,7 @@ Before you begin, you need:
     ```
 
     <Note>
-      This endpoint returns `409` until the document is signed. Poll [signature request events](/api-reference/endpoint/get-signature-request-events) or check the [signature request](/api-reference/endpoint/get-signature-request) `status` to know when it's `Completed`.
+      This endpoint returns `409` until the document is complete. Wait for the [`document_completed`](/webhooks/events#document_completed) webhook, or poll [signature request events](/api-reference/endpoint/get-signature-request-events) / the [signature request](/api-reference/endpoint/get-signature-request) `status` until it's `Completed`.
     </Note>
 
     The signed PDF includes an audit trail with created, sent, signed, and completed events.

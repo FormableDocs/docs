@@ -20,17 +20,17 @@ This walkthrough covers the full embedded signing flow: create a signature reque
 Before you begin:
 
 1. Create an organization and [API key](/authentication) in [Settings](https://app.formabledocs.com/settings).
-2. Upload a template and place at least one signature field — see the [Embedded templates walkthrough](/walkthroughs/embedded-templates).
+2. Upload a template, place at least one required signature field, and assign it a signer role — see the [Embedded templates walkthrough](/walkthroughs/embedded-templates).
 3. Call the Formable API from your **backend** only. Never expose your API key in the browser.
 
 ## Overview
 
 <Steps>
-  <Step title="Create a signature request">
-    Start a request from a template with a signer and sender.
+  <Step title="Create an embedded signature request">
+    Start a request from a template with one or more signers (each with a role).
   </Step>
   <Step title="Generate a signing URL">
-    Mint a short-lived URL for that request just before the signer is ready.
+    Mint a short-lived URL for a signer's `recipientSignatureId` just before they are ready.
   </Step>
   <Step title="Embed the URL in an iframe">
     Load the signing experience inside your product.
@@ -44,32 +44,48 @@ Before you begin:
 
 Create the signature request and signing URL on your backend, then pass only the URL to the client.
 
-### 1. Create a signature request
+### 1. Create an embedded signature request
 
-Start from a template you've already prepared. A signature request needs:
+Start from a template you've already prepared. An embedded signature request needs:
 
 - `templateId` — which document to send
-- `signer` — who will sign (`email` + `name`)
-- `sender` — who is sending it (`email` + `name`)
+- `signers` — who will sign (`email`, `name`, and `role` for every role used by required fields)
+
+`sender` is optional. When omitted, Formable uses the API key organization owner.
 
 ```bash
 curl --request POST \
-  --url https://api.formabledocs.com/api/v0/signature-requests \
+  --url https://api.formabledocs.com/v1/signature-requests/embedded \
   --header "Authorization: Bearer $TOKEN" \
   --header 'Content-Type: application/json' \
   --data '{
     "templateId": "abc123xyz",
-    "signer": { "email": "signer@example.com", "name": "Jane Doe" },
+    "signers": [
+      { "email": "signer@example.com", "name": "Jane Doe", "role": "Client" }
+    ],
     "sender": { "email": "you@yourcompany.com", "name": "Your Company" },
     "testMode": true
   }'
 ```
 
 ```json Response
-{ "signatureRequestId": "sr_456def" }
+{
+  "signatureRequestId": "sr_456def",
+  "templateId": "abc123xyz",
+  "signers": [
+    {
+      "email": "signer@example.com",
+      "name": "Jane Doe",
+      "recipientSignatureId": "rsig_789ghi"
+    }
+  ],
+  "sender": { "email": "you@yourcompany.com", "name": "Your Company" },
+  "status": "Created",
+  "testMode": true
+}
 ```
 
-Save the `signatureRequestId`. You'll use it to generate a signing URL, track progress, and download the signed PDF.
+Save the `signatureRequestId` for status and download. Save each signer's `recipientSignatureId` to mint their signing URL.
 
 #### Prefill fields
 
@@ -78,7 +94,9 @@ Templates can include fields beyond the signature — company name, dates, check
 ```json
 {
   "templateId": "abc123xyz",
-  "signer": { "email": "signer@example.com", "name": "Jane Doe" },
+  "signers": [
+    { "email": "signer@example.com", "name": "Jane Doe", "role": "Client" }
+  ],
   "sender": { "email": "you@yourcompany.com", "name": "Your Company" },
   "fields": [
     { "fieldId": "field_company_name", "value": "Acme Corporation" },
@@ -98,11 +116,11 @@ Set `testMode: true` while integrating so the request doesn't count toward billi
 
 ### 2. Generate a signing URL
 
-A **signing URL** opens the signing experience for this request. It expires **one hour** after creation, so generate it right before you show it to the signer.
+A **signing URL** opens the signing experience for one recipient. Create it with that signer's `recipientSignatureId`. It expires **one hour** after creation, so generate it right before you show it to the signer.
 
 ```bash
 curl --request POST \
-  --url https://api.formabledocs.com/api/v0/signature-requests/sr_456def/url \
+  --url https://api.formabledocs.com/v1/recipient-signatures/rsig_789ghi/url \
   --header "Authorization: Bearer $TOKEN"
 ```
 
@@ -136,14 +154,14 @@ Request the URL from your backend and pass it to the page just before rendering:
 <CodeGroup>
 
 ```javascript React
-function SigningFrame({ signatureRequestId }) {
+function SigningFrame({ recipientSignatureId }) {
   const [signingUrl, setSigningUrl] = useState(null);
 
   useEffect(() => {
-    fetch(`/api/formable/signing-url?signatureRequestId=${signatureRequestId}`)
+    fetch(`/api/formable/signing-url?recipientSignatureId=${recipientSignatureId}`)
       .then((res) => res.json())
       .then((data) => setSigningUrl(data.signingUrl));
-  }, [signatureRequestId]);
+  }, [recipientSignatureId]);
 
   if (!signingUrl) return <p>Loading…</p>;
 
@@ -242,13 +260,13 @@ When the signer finishes, the signature request `status` becomes `Completed`. Yo
 
     Always check `event.origin`. Treat these as client UX signals — confirm completion with a webhook or API poll before downloading the signed PDF.
   </Accordion>
-  <Accordion title="Listen for the document_signed webhook" icon="bell">
-    Configure a [webhook endpoint](/webhooks/overview) and handle the [`document_signed`](/webhooks/events#document_signed) event. Formable pushes this once signing is complete, so you can react without polling.
+  <Accordion title="Listen for the document_completed webhook" icon="bell">
+    Configure a [webhook endpoint](/webhooks/overview) and handle the [`document_completed`](/webhooks/events#document_completed) event. Formable pushes this once the signed PDF is ready, so you can download without polling. Do not use [`document_signed`](/webhooks/events#document_signed) alone — that fires when a signer finishes, before the completed file is available.
 
     ```json
     {
       "event": {
-        "event_type": "document_signed",
+        "event_type": "document_completed",
         "event_category": "signing"
       },
       "signing": {
@@ -262,7 +280,7 @@ When the signer finishes, the signature request `status` becomes `Completed`. Yo
 
     ```bash
     curl --request GET \
-      --url https://api.formabledocs.com/api/v0/signature-requests/sr_456def \
+      --url https://api.formabledocs.com/v1/signature-requests/sr_456def \
       --header "Authorization: Bearer $TOKEN"
     ```
   </Accordion>
@@ -271,14 +289,14 @@ When the signer finishes, the signature request `status` becomes `Completed`. Yo
 
     ```bash
     curl --request GET \
-      --url https://api.formabledocs.com/api/v0/signature-requests/sr_456def/events \
+      --url https://api.formabledocs.com/v1/signature-requests/sr_456def/events \
       --header "Authorization: Bearer $TOKEN"
     ```
   </Accordion>
 </AccordionGroup>
 
 <Tip>
-  Use iframe `postMessage` for immediate UI updates, and prefer the webhook as the source of truth. Use [List signature requests](/api-reference/endpoint/list-signature-requests) with `updatedSince`, or the event stream, to reconcile anything you missed.
+  Use iframe `postMessage` for immediate UI updates, and prefer the `document_completed` webhook as the source of truth before downloading. Use [List signature requests](/api-reference/endpoint/list-signature-requests) with `updatedSince`, or the event stream, to reconcile anything you missed.
 </Tip>
 
 ## Download the signed PDF
@@ -287,7 +305,7 @@ Once status is `Completed`, fetch a temporary download URL for the signed PDF (t
 
 ```bash
 curl --request GET \
-  --url https://api.formabledocs.com/api/v0/signature-requests/sr_456def/signed-envelope \
+  --url https://api.formabledocs.com/v1/signature-requests/sr_456def/signed-envelope \
   --header "Authorization: Bearer $TOKEN"
 ```
 
@@ -297,7 +315,14 @@ curl --request GET \
 }
 ```
 
-Open or download that URL promptly — it is a short-lived presigned link.
+Open or download that URL promptly — it is a short-lived presigned link. The signed PDF includes an audit trail with timestamps, actors, and IP addresses for each step.
+
+<Frame caption="Audit trail appended to the signed PDF, showing Created, Sent, Signed, and Completed events.">
+  <img
+    src="/static/images/embedded-signing/signed-doc-with-audit-trail.png"
+    alt="Formable audit trail page for document.docx with Envelope ID, Completed status, and a Document History of Created, Sent, Signed, and Completed events"
+  />
+</Frame>
 
 <Note>
   Requesting the signed envelope before signing is complete returns `409` with `"Envelope has not been signed yet"`.

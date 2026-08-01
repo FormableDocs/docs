@@ -3,7 +3,7 @@ title: "Event catalog"
 description: "Every webhook event type and its payload schema."
 ---
 
-This page lists every event Formable sends to your webhook endpoint. Most integrations only need **signing** events (`document_viewed`, `document_signed`). **Redlining** events are listed below for the optional negotiation workflow.
+This page lists every event Formable sends to your webhook endpoint. Most integrations only need **signing** events (`document_viewed`, `document_signed`, `document_completed`). **Redlining** events are listed below for the optional negotiation workflow.
 
 Every payload shares the same top-level shape — an `event` metadata object plus a category-specific object:
 
@@ -62,7 +62,11 @@ The signer opened the document for the first time.
 
 ### `document_signed`
 
-The signer completed and signed the document. Once signed, you can fetch the [signed envelope](/api-reference/endpoint/get-signed-envelope).
+A single signer completed and signed the document. This does not mean the signed PDF is ready yet — wait for [`document_completed`](#document_completed) before fetching the [signed envelope](/api-reference/endpoint/get-signed-envelope).
+
+<ResponseField name="signing.recipient_signature_id" type="string">
+  The ID of the recipient who signed. Matches the `recipientSignatureId` returned when you [create a signature request](/api-reference/endpoint/create-signature-request).
+</ResponseField>
 
 ```json
 {
@@ -70,6 +74,25 @@ The signer completed and signed the document. Once signed, you can fetch the [si
     "event_id": "p-1phZC6_oU8qS191gsLT",
     "event_category": "signing",
     "event_type": "document_signed",
+    "event_time": 1777039156023
+  },
+  "signing": {
+    "signature_request_id": "YfdkOH7dVtaGzl-egS6NI",
+    "recipient_signature_id": "rsig_789ghi"
+  }
+}
+```
+
+### `document_completed`
+
+All required fields are filled, the signature request is complete, and the signed PDF (with audit trail) is ready to download. If there are multiple signers, this means all signers have signed. Wait for this event before calling [Get signed envelope](/api-reference/endpoint/get-signed-envelope).
+
+```json
+{
+  "event": {
+    "event_id": "p-1phZC6_oU8qS191gsLT",
+    "event_category": "signing",
+    "event_type": "document_completed",
     "event_time": 1777039156023
   },
   "signing": {
@@ -312,8 +335,8 @@ Switch on `event.event_type` to route each event. Unknown types should be ignore
 
 ```javascript
 switch (payload.event.event_type) {
-  case "document_signed":
-    await onDocumentSigned(payload.signing.signature_request_id);
+  case "document_completed":
+    await onDocumentCompleted(payload.signing.signature_request_id);
     break;
   case "document_ready_for_signing":
     await onReadyForSigning(payload.redlining.redline_request_id);

@@ -39,7 +39,8 @@
                 "group": "Dropbox Sign",
                 "pages": [
                   "migrations/dropbox-sign/embedded-templates",
-                  "migrations/dropbox-sign/embedded-signing"
+                  "migrations/dropbox-sign/embedded-signing",
+                  "migrations/dropbox-sign/non-embedded-signing"
                 ]
               },
               {
@@ -88,8 +89,8 @@
           {
             "group": "Signature Requests",
             "pages": [
-              "api-reference/endpoint/create-signature-request",
               "api-reference/endpoint/create-regular-signature-request",
+              "api-reference/endpoint/create-signature-request",
               "api-reference/endpoint/list-signature-requests",
               "api-reference/endpoint/get-signature-request",
               "api-reference/endpoint/create-signing-url",

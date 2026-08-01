@@ -27,7 +27,7 @@ In Adobe Acrobat Sign apps you typically:
 
 In Formable you:
 
-1. `POST /v0/templates` with the file
+1. `POST /v1/templates` with the file
 2. Embed `editUrl` so users place fields in your product
 3. Copy each field's `id` for later prefills
 4. Create signature requests with that `templateId` and a `signers` array
@@ -41,7 +41,7 @@ You are migrating document preparation and in-product editing. Agreement send an
     Create an organization and key in [Settings](https://app.formabledocs.com/settings). See [Authentication](/authentication).
   </Step>
   <Step title="Re-upload each library document">
-    Call [`POST /v0/templates`](/api-reference/endpoint/create-template) with PDF or Word files (max 40MB).
+    Call [`POST /v1/templates`](/api-reference/endpoint/create-template) with PDF or Word files (max 40MB).
   </Step>
   <Step title="Replace authoring / EDIT views">
     Embed `editUrl` from create, or [`POST .../edit-url`](/api-reference/endpoint/create-template-edit-url) when it expires.
@@ -77,7 +77,7 @@ Plan for these Acrobat Sign-specific patterns that do not map 1:1:
 | Prefill keys | Form field / merge field names | `fieldId` from the Formable editor |
 | Edit view | Library `EDIT` view or agreement authoring view | `editTemplateAccess.editUrl` or `POST .../edit-url` |
 | Editor TTL | View expiration from Acrobat Sign | Default about **1 day**; mint just in time |
-| Roles on create | Participant sets / roles on library or agreement | Fields in the editor; `signers` at send time |
+| Roles on create | Participant sets / roles on library or agreement | Optional `signer_roles` on create; assign roles to fields in the editor; pass `signers[].role` at send time |
 
 Anchor text generators, absolute coordinates in form-field payloads, and per-send AUTHORING agreements do not carry over as the primary path. Recreate positions in the Formable editor, then store the new `fieldId`s in your database or config.
 
@@ -90,14 +90,14 @@ Anchor text generators, absolute coordinates in form-field payloads, and per-sen
 | Form fields (signature, text, date, …) | Fields (Signature, Text, Date, …) | Placed in Formable's visual editor. |
 | Library `EDIT` / authoring view URL | `editUrl` | Embed in an iframe. Expires (default **1 day**). |
 | Merge / form field names | `fieldId` | Prefill by ID at signature-request time. |
-| Participant roles on the library | Signers at send time | Roles aren't declared on template create. |
+| Participant roles on the library | Optional `signer_roles` on create + field placement in the editor | Pass matching `signers[].role` at send time. |
 
 ## Endpoint map
 
 | Adobe Acrobat Sign | Formable |
 | --- | --- |
-| `POST /transientDocuments` + `POST /libraryDocuments` | [`POST /v0/templates`](/api-reference/endpoint/create-template) |
-| `POST /libraryDocuments/{id}/views` (`EDIT`) | [`POST /v0/templates/{templateId}/edit-url`](/api-reference/endpoint/create-template-edit-url) |
+| `POST /transientDocuments` + `POST /libraryDocuments` | [`POST /v1/templates`](/api-reference/endpoint/create-template) |
+| `POST /libraryDocuments/{id}/views` (`EDIT`) | [`POST /v1/templates/{templateId}/edit-url`](/api-reference/endpoint/create-template-edit-url) |
 | Agreement `AUTHORING` + authoring view | Formable template `editUrl` (prepare once, not per send) |
 | `editUrl` / view URL on create | `editTemplateAccess.editUrl` returned from create |
 
@@ -106,7 +106,7 @@ Anchor text generators, absolute coordinates in form-field payloads, and per-sen
 Acrobat Sign library APIs sit under regional `/api/rest/v6/...` hosts with an OAuth token. Formable uses the same Bearer key as signing:
 
 ```bash
-curl https://api.formabledocs.com/api/v0/templates \
+curl https://api.formabledocs.com/v1/templates \
   --header "Authorization: Bearer fmbl_YOUR_API_KEY" \
   --form 'file=@./agreement.pdf' \
   --form 'filename=agreement.pdf'
@@ -132,10 +132,11 @@ POST /api/rest/v6/libraryDocuments
 
 ```bash
 curl --request POST \
-  --url https://api.formabledocs.com/api/v0/templates \
+  --url https://api.formabledocs.com/v1/templates \
   --header "Authorization: Bearer $TOKEN" \
   --form 'file=@./agreement.pdf' \
-  --form 'filename=agreement.pdf'
+  --form 'filename=agreement.pdf' \
+  --form 'signer_roles=[{"name":"SIGNER","order":0}]'
 ```
 
 ```json Response
@@ -148,7 +149,7 @@ curl --request POST \
 }
 ```
 
-There is no separate transient document step. The organization comes from the API key. Supported uploads: PDF, DOCX, and DOC, up to **40MB**.
+There is no separate transient document step. The organization comes from the API key. Supported uploads: PDF, DOCX, and DOC, up to **40MB**. `signer_roles` is optional — pass it as a JSON string in multipart form data when you want named roles before opening the editor. You still assign those roles to required fields in the editor.
 
 ### 2. Get a fresh editor URL
 
@@ -156,7 +157,7 @@ When the create URL has expired, or whenever a user needs to edit again:
 
 ```bash
 curl --request POST \
-  --url https://api.formabledocs.com/api/v0/templates/abc123xyz/edit-url \
+  --url https://api.formabledocs.com/v1/templates/abc123xyz/edit-url \
   --header "Authorization: Bearer $TOKEN"
 ```
 
@@ -205,7 +206,7 @@ If you previously set `mergeFieldInfo` when creating an agreement, use Formable 
     Anchor text generators and coordinate payloads don't carry over as the primary path. Place fields in Formable's editor and reference `fieldId`s for prefills.
   </Accordion>
   <Accordion title="Prepare once, not AUTHORING per send">
-    Some Acrobat Sign flows author fields on each agreement. Formable templates hold fields; you pass `signers` when creating the signature request.
+    Some Acrobat Sign flows author fields on each agreement. Formable templates hold fields; you pass `signers` (with `role`) when creating the signature request.
   </Accordion>
   <Accordion title="API key instead of OAuth">
     Template create and edit-url calls use the same Bearer API key as signing — no regional OAuth token or `x-api-user`.
@@ -222,7 +223,7 @@ If you previously set `mergeFieldInfo` when creating an agreement, use Formable 
     In [Settings](https://app.formabledocs.com/settings).
   </Step>
   <Step title="Re-upload each library document">
-    Call [`POST /v0/templates`](/api-reference/endpoint/create-template).
+    Call [`POST /v1/templates`](/api-reference/endpoint/create-template).
   </Step>
   <Step title="Replace authoring / EDIT views">
     Embed `editUrl` from create or [`POST .../edit-url`](/api-reference/endpoint/create-template-edit-url).

@@ -56,10 +56,11 @@ Send the file as `multipart/form-data` with a `file` part and a `filename` field
 
 ```bash
 curl --request POST \
-  --url https://api.formabledocs.com/api/v0/templates \
+  --url https://api.formabledocs.com/v1/templates \
   --header "Authorization: Bearer $TOKEN" \
   --form 'file=@./agreement.docx' \
-  --form 'filename=agreement.docx'
+  --form 'filename=agreement.docx' \
+  --form 'signer_roles=[{"name":"Client","order":0}]'
 ```
 
 ```json Response
@@ -74,6 +75,8 @@ curl --request POST \
 
 Save the `templateId`. This is the ID you pass to the signing API when you [create a signature request](/walkthroughs/embedded-signing) (and when you create redline requests).
 
+`signer_roles` is optional. Pass it as a JSON string in multipart form data when you want named roles (for example `Client`, `Witness`) before opening the editor. You'll assign those roles to required fields in the editor, then pass matching `signers[].role` values when creating a signature request.
+
 <Warning>
   Files over 40MB return `413`. Unsupported file types return `400` with `"Unsupported file type, only pdf, docx, and doc are supported"`.
 </Warning>
@@ -84,7 +87,7 @@ Editor URLs expire (by default one day after creation). Mint a fresh one when a 
 
 ```bash
 curl --request POST \
-  --url https://api.formabledocs.com/api/v0/templates/abc123xyz/edit-url \
+  --url https://api.formabledocs.com/v1/templates/abc123xyz/edit-url \
   --header "Authorization: Bearer $TOKEN"
 ```
 
@@ -202,7 +205,7 @@ In the embedded editor, use the **Field selector** to place and configure fields
 | **Checkbox** | A boolean toggle |
 | **Amount** | A monetary value |
 
-Select a placed field to set whether it's required and to copy its **Reference ID**. You can reference these IDs if you decide to [prefill fields](/walkthroughs/embedded-signing#prefill-fields) on a signature request.
+Select a placed field to set whether it's required, assign a **signer role**, and copy its **Reference ID**. Required fields must have a role before you can create a signature request. You can reference field IDs if you decide to [prefill fields](/walkthroughs/embedded-signing#prefill-fields) on a signature request.
 
 <Frame caption="A Signature field selected on the document. Copy the Reference ID from the sidebar for prefills.">
   <img

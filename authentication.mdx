@@ -39,13 +39,13 @@ Include the key in the `Authorization` header of every API request.
 
 ```bash cURL
 curl --request GET \
-  --url https://api.formabledocs.com/api/v0/signature-requests \
+  --url https://api.formabledocs.com/v1/signature-requests \
   --header 'Authorization: Bearer fmbl_YOUR_API_KEY'
 ```
 
 ```javascript Node.js
 const res = await fetch(
-  "https://api.formabledocs.com/api/v0/signature-requests",
+  "https://api.formabledocs.com/v1/signature-requests",
   {
     headers: {
       Authorization: `Bearer ${process.env.FORMABLE_API_KEY}`,
@@ -59,7 +59,7 @@ import os
 import requests
 
 res = requests.get(
-    "https://api.formabledocs.com/api/v0/signature-requests",
+    "https://api.formabledocs.com/v1/signature-requests",
     headers={"Authorization": f"Bearer {os.environ['FORMABLE_API_KEY']}"},
 )
 ```
@@ -71,10 +71,10 @@ Keys start with `fmbl_`. Treat them like passwords: store them in a secrets mana
 ## Base URL
 
 ```text
-https://api.formabledocs.com/api
+https://api.formabledocs.com/v1
 ```
 
-All endpoints are versioned under `/v0`, so a full URL looks like `https://api.formabledocs.com/api/v0/signature-requests`.
+All endpoints are served under this base URL, so a full path looks like `https://api.formabledocs.com/v1/signature-requests`.
 
 ## Authorization errors
 
