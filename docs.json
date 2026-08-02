@@ -36,7 +36,8 @@
             "group": "SDKs",
             "pages": [
               "sdks/overview",
-              "sdks/node"
+              "sdks/node",
+              "sdks/python"
             ]
           },
           {

@@ -1,0 +1,193 @@
+---
+title: "Python"
+description: "Install and use formable-sdk, the official Python SDK for the Formable API."
+---
+
+[`formable-sdk`](https://pypi.org/project/formable-sdk/) is the official Python SDK for the Formable API (v1). It covers templates, signature requests, redlining, and billing.
+
+- Sync (`Formable`) and async (`AsyncFormable`) clients
+- Fully typed requests and responses (`py.typed`)
+- Python 3.9+
+
+Source code is on [GitHub](https://github.com/FormableDocs/formable-python).
+
+## Installation
+
+<CodeGroup>
+
+```bash pip
+pip install formable-sdk
+```
+
+```bash uv
+uv add formable-sdk
+```
+
+```bash poetry
+poetry add formable-sdk
+```
+
+</CodeGroup>
+
+## Initialize the client
+
+Pass your API key from [Settings](https://app.formabledocs.com/settings). It's sent as a bearer token on every request.
+
+```python
+import os
+from formable import Formable
+
+formable = Formable(api_key=os.environ["FORMABLE_API_KEY"])
+```
+
+## Templates
+
+Upload a document to create a reusable template, then mint edit URLs to place fields in the embedded editor. See the [embedded templates walkthrough](/walkthroughs/embedded-templates).
+
+```python
+with open("nda.docx", "rb") as f:
+    result = formable.templates.create(
+        file=f.read(),
+        filename="nda.docx",
+        signer_roles=[
+            {"name": "Client", "order": 0},
+            {"name": "Witness", "order": 1},
+        ],
+    )
+
+template_id = result["templateId"]
+
+# Mint a fresh edit URL later (expires after 1 day)
+edit = formable.templates.create_edit_url(template_id)
+print(edit["editUrl"], edit["expiresAt"])
+```
+
+## Signature requests
+
+Send a template for signing by email, or embed the signing experience in your product. See the [embedded signing walkthrough](/walkthroughs/embedded-signing).
+
+```python
+# Formable emails each signer a signing link
+request = formable.signature_requests.create(
+    template_id=template_id,
+    signers=[
+        {"email": "jane@example.com", "name": "Jane Doe", "role": "Client"},
+        {"email": "bob@example.com", "name": "Bob Smith", "role": "Witness"},
+    ],
+)
+
+# Embedded flow: mint signing URLs to embed in an iframe yourself
+embedded = formable.signature_requests.create_embedded(
+    template_id=template_id,
+    signers=[{"email": "jane@example.com", "name": "Jane Doe", "role": "Client"}],
+    test_mode=True,
+)
+
+signer = embedded["signers"][0]
+signing = formable.signature_requests.create_signing_url(
+    signer["recipientSignatureId"]
+)
+
+# Track progress
+from datetime import datetime, timezone
+
+current = formable.signature_requests.get(embedded["signatureRequestId"])
+all_requests = formable.signature_requests.list(
+    updated_since=datetime(2026, 1, 1, tzinfo=timezone.utc)
+)
+events = formable.signature_requests.get_events(embedded["signatureRequestId"])
+
+# Download the signed document once completed
+envelope = formable.signature_requests.get_signed_envelope(
+    embedded["signatureRequestId"]
+)
+print(envelope["signedEnvelopePresignedUrl"])
+```
+
+<Note>
+  `get_signed_envelope` raises a `409` until the document is complete. Wait for the [`document_completed`](/webhooks/events#document_completed) webhook, or poll `get` until `status` is `Completed`.
+</Note>
+
+## Redline requests
+
+Run turn-based contract negotiation before signing. See the [redlining walkthrough](/walkthroughs/redlining).
+
+```python
+created = formable.redline_requests.create(
+    template_id=template_id,
+    members=[
+        {"email": "us@example.com", "display_name": "John Doe", "role": "DisclosingParty"},
+        {"email": "them@example.com", "display_name": "Jane Smith", "role": "ReceivingParty"},
+    ],
+    metadata={"subject": "Mutual NDA"},
+)
+
+redline_request_id = created["redlineRequestId"]
+
+# Mint a redline URL for a member (embed in an iframe)
+url = formable.redline_requests.create_url(redline_request_id, "them@example.com")
+
+# Manage members and track progress
+formable.redline_requests.update_members(
+    redline_request_id,
+    [{"email": "counsel@example.com", "display_name": "Counsel", "role": "ReceivingCounsel"}],
+)
+redline = formable.redline_requests.get(redline_request_id)
+events = formable.redline_requests.get_events(redline_request_id)
+```
+
+## Billing and health
+
+```python
+billing = formable.billing()
+print(billing["numberOfRedliningSessions"])
+
+health = formable.health()
+```
+
+## Async client
+
+Every method is also available on `AsyncFormable` with the same signatures.
+
+```python
+import asyncio
+from formable import AsyncFormable
+
+async def main():
+    async with AsyncFormable(api_key=os.environ["FORMABLE_API_KEY"]) as formable:
+        health = await formable.health()
+
+asyncio.run(main())
+```
+
+## Error handling
+
+All non-2xx responses raise a `FormableError` with the server's error message, HTTP status, and parsed response body.
+
+```python
+from formable import FormableError
+
+try:
+    formable.signature_requests.get("missing-id")
+except FormableError as error:
+    print(error.status, error)
+```
+
+## Configuration
+
+| Option     | Description                                                | Default                           |
+| ---------- | ---------------------------------------------------------- | --------------------------------- |
+| `api_key`  | Your Formable API key (sent as a bearer token). Required.  | -                                 |
+| `base_url` | Override the API base URL.                                 | `https://api.formabledocs.com/v1` |
+| `client`   | Custom `httpx.Client` (or `httpx.AsyncClient` for async).  | Built-in client with 60s timeout  |
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Go from a plain document to a signed PDF in 4 calls.
+  </Card>
+  <Card title="API reference" icon="code" href="/api-reference/introduction">
+    Every endpoint the SDK wraps, with a live playground.
+  </Card>
+</CardGroup>

@@ -6,21 +6,27 @@ description: "Official Formable SDKs for building with the Formable API in your 
 Formable provides official SDKs (software development kits) to build with the Formable API using your preferred programming language. The SDKs are helper libraries that wrap the [REST API](/api-reference/introduction) with typed requests and responses, so you don't have to hand-roll HTTP calls.
 
 <Info>
-  Formable SDKs are licensed under the [MIT license](https://github.com/FormableDocs/formable-node/blob/main/LICENSE).
+  Formable SDKs are licensed under the MIT license.
 </Info>
 
 ## Official Formable SDKs
 
-| Language | Quick reference                 | Package                                                        |
-| -------- | ------------------------------- | -------------------------------------------------------------- |
-| Node.js  | [Node SDK overview](/sdks/node) | [`formable-node`](https://www.npmjs.com/package/formable-node) |
+| Language | Quick reference                     | Package                                                        |
+| -------- | ----------------------------------- | -------------------------------------------------------------- |
+| Node.js  | [Node SDK overview](/sdks/node)     | [`formable-node`](https://www.npmjs.com/package/formable-node) |
+| Python   | [Python SDK overview](/sdks/python) | [`formable-sdk`](https://pypi.org/project/formable-sdk/)       |
 
 Every SDK has full feature parity with the API: templates, signature requests, redlining, billing, and health checks.
 
 ## Other languages
 
-If your language doesn't have an official SDK yet, call the [REST API](/api-reference/introduction) directly. Every endpoint page in the API reference includes ready-to-copy examples for cURL, Python, Go, PHP, and more.
+If your language doesn't have an official SDK yet, call the [REST API](/api-reference/introduction) directly. Every endpoint page in the API reference includes ready-to-copy examples for cURL, Go, PHP, and more.
 
-<Card title="Node SDK" icon="node-js" href="/sdks/node" horizontal>
-  Install `formable-node` and make your first API call in TypeScript or JavaScript.
-</Card>
+<CardGroup cols={2}>
+  <Card title="Node SDK" icon="node-js" href="/sdks/node">
+    Install `formable-node` and make your first API call in TypeScript or JavaScript.
+  </Card>
+  <Card title="Python SDK" icon="python" href="/sdks/python">
+    Install `formable-sdk` and make your first API call with the sync or async client.
+  </Card>
+</CardGroup>
